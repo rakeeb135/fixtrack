@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient'
 export default function App() {
   const [repairs, setRepairs] = useState([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Form State
   const [customerName, setCustomerName] = useState('')
@@ -12,7 +13,6 @@ export default function App() {
   const [issue, setIssue] = useState('')
   const [cost, setCost] = useState('')
 
-  // 1. Fetch repairs from Supabase on load
   useEffect(() => {
     fetchRepairs()
   }, [])
@@ -32,7 +32,6 @@ export default function App() {
     setLoading(false)
   }
 
-  // 2. Add new repair job to Supabase
   async function handleAddRepair(e) {
     e.preventDefault()
     if (!customerName || !phoneNumber || !deviceModel) {
@@ -40,7 +39,6 @@ export default function App() {
       return
     }
 
-    // Format phone number to international format without + sign (e.g., 94771234567)
     let formattedPhone = phoneNumber.trim()
     if (formattedPhone.startsWith('0')) {
       formattedPhone = '94' + formattedPhone.slice(1)
@@ -60,7 +58,6 @@ export default function App() {
     if (error) {
       alert('Error adding repair job: ' + error.message)
     } else {
-      // Clear form and refresh list
       setCustomerName('')
       setPhoneNumber('')
       setDeviceModel('')
@@ -70,7 +67,6 @@ export default function App() {
     }
   }
 
-  // 3. Update repair status in Supabase
   async function updateStatus(id, newStatus) {
     const { error } = await supabase
       .from('repairs')
@@ -84,7 +80,18 @@ export default function App() {
     }
   }
 
-  // 4. Send WhatsApp Notification
+  async function deleteRepair(id) {
+    if (!window.confirm(`Are you sure you want to delete Job #${id}?`)) return
+
+    const { error } = await supabase.from('repairs').delete().eq('id', id)
+
+    if (error) {
+      alert('Error deleting job: ' + error.message)
+    } else {
+      fetchRepairs()
+    }
+  }
+
   function sendWhatsAppNotification(job) {
     let message = ''
     if (job.status === 'Ready') {
@@ -100,6 +107,17 @@ export default function App() {
     window.open(whatsappUrl, '_blank')
   }
 
+  // Filter jobs based on search input
+  const filteredRepairs = repairs.filter((job) => {
+    const query = searchQuery.toLowerCase()
+    return (
+      job.customer_name?.toLowerCase().includes(query) ||
+      job.phone_number?.includes(query) ||
+      job.device_model?.toLowerCase().includes(query) ||
+      job.status?.toLowerCase().includes(query)
+    )
+  })
+
   return (
     <div style={styles.container}>
       <header style={styles.header}>
@@ -109,7 +127,7 @@ export default function App() {
 
       {/* NEW REPAIR FORM */}
       <div style={styles.card}>
-        <h2 style={{ marginTop: 0 }}>Log New Repair Job</h2>
+        <h2>Log New Repair Job</h2>
         <form onSubmit={handleAddRepair} style={styles.formGrid}>
           <input
             type="text"
@@ -154,13 +172,23 @@ export default function App() {
 
       {/* ACTIVE REPAIRS LEDGER */}
       <div style={styles.card}>
-        <h2>Active Repair Jobs</h2>
+        <div style={styles.tableHeaderSection}>
+          <h2>Active Repair Jobs ({filteredRepairs.length})</h2>
+          <input
+            type="text"
+            placeholder="🔍 Search customer, phone, device..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={styles.searchInput}
+          />
+        </div>
+
         {loading ? (
           <p>Loading repairs from database...</p>
-        ) : repairs.length === 0 ? (
-          <p>No repair jobs logged yet. Add your first job above!</p>
+        ) : filteredRepairs.length === 0 ? (
+          <p>No matching repair jobs found.</p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div style={styles.tableWrapper}>
             <table style={styles.table}>
               <thead>
                 <tr style={{ backgroundColor: '#f1f5f9', textAlign: 'left' }}>
@@ -174,13 +202,13 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {repairs.map((job) => (
+                {filteredRepairs.map((job) => (
                   <tr key={job.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <td style={styles.td}>#{job.id}</td>
                     <td style={styles.td}>
                       <strong>{job.customer_name}</strong>
                       <br />
-                      <small>{job.phone_number}</small>
+                      <small style={{ color: '#64748b' }}>{job.phone_number}</small>
                     </td>
                     <td style={styles.td}>{job.device_model}</td>
                     <td style={styles.td}>{job.issue || '-'}</td>
@@ -198,12 +226,21 @@ export default function App() {
                       </select>
                     </td>
                     <td style={styles.td}>
-                      <button
-                        onClick={() => sendWhatsAppNotification(job)}
-                        style={styles.btnWhatsApp}
-                      >
-                        💬 Notify
-                      </button>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          onClick={() => sendWhatsAppNotification(job)}
+                          style={styles.btnWhatsApp}
+                        >
+                          💬 Notify
+                        </button>
+                        <button
+                          onClick={() => deleteRepair(job.id)}
+                          style={styles.btnDelete}
+                          title="Delete Job"
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -216,13 +253,12 @@ export default function App() {
   )
 }
 
-// Inline Styles for instant clean UI
 const styles = {
   container: {
     fontFamily: 'system-ui, -apple-system, sans-serif',
     backgroundColor: '#f8fafc',
     minHeight: '100vh',
-    padding: '20px',
+    padding: '16px',
     maxWidth: '1000px',
     margin: '0 auto',
     color: '#0f172a',
@@ -246,6 +282,24 @@ const styles = {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     gap: '10px',
+  },
+  tableHeaderSection: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '10px',
+    marginBottom: '15px',
+  },
+  searchInput: {
+    padding: '8px 12px',
+    border: '1px solid #cbd5e1',
+    borderRadius: '6px',
+    fontSize: '14px',
+    width: '100%',
+    maxWidth: '280px',
+    backgroundColor: '#ffffff',
+    color: '#0f172a',
   },
   input: {
     padding: '10px',
@@ -272,11 +326,24 @@ const styles = {
     borderRadius: '6px',
     cursor: 'pointer',
     fontWeight: 'bold',
+    fontSize: '13px',
+  },
+  btnDelete: {
+    backgroundColor: '#ef4444',
+    color: '#fff',
+    border: 'none',
+    padding: '6px 10px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+  },
+  tableWrapper: {
+    overflowX: 'auto',
+    WebkitOverflowScrolling: 'touch',
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    marginTop: '10px',
+    minWidth: '650px',
     color: '#0f172a',
   },
   th: {
