@@ -2,13 +2,17 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 
 export default function App() {
-  // Simple routing check for Customer Tracking Link (?track=JOB_ID)
   const urlParams = new URLSearchParams(window.location.search)
   const trackingJobId = urlParams.get('track')
 
   const [repairs, setRepairs] = useState([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('active') // 'active' or 'completed'
   const [searchQuery, setSearchQuery] = useState('')
+  const [activeMenuId, setActiveMenuId] = useState(null)
+
+  // Edit Modal State
+  const [editingJob, setEditingJob] = useState(null)
 
   // Form State
   const [customerName, setCustomerName] = useState('')
@@ -43,8 +47,10 @@ export default function App() {
     return (
       <div style={styles.container}>
         <header style={styles.header}>
-          <h1 style={{ margin: 0 }}>FixTrack</h1>
-          <p style={{ margin: '5px 0 0 0', opacity: 0.9 }}>Customer Status Tracker</p>
+          <h1 style={{ margin: 0, fontSize: '22px' }}>FixTrack</h1>
+          <p style={{ margin: '4px 0 0 0', opacity: 0.9, fontSize: '13px' }}>
+            Live Repair Status
+          </p>
         </header>
 
         <div style={styles.card}>
@@ -52,19 +58,23 @@ export default function App() {
             <p style={{ textAlign: 'center' }}>Loading status...</p>
           ) : !trackedJob ? (
             <p style={{ textAlign: 'center', color: '#ef4444' }}>
-              Repair Job #{trackingJobId} not found. Please verify your link.
+              Repair Job #{trackingJobId} not found. Please check your link.
             </p>
           ) : (
-            <div style={{ textAlign: 'center', padding: '10px' }}>
-              <span style={{ fontSize: '14px', color: '#64748b' }}>Repair Job ID</span>
-              <h2 style={{ fontSize: '28px', margin: '5px 0 15px 0' }}>#{trackedJob.id}</h2>
+            <div style={{ textAlign: 'center', padding: '10px 5px' }}>
+              <span style={{ fontSize: '13px', color: '#64748b' }}>
+                Job Tracking ID
+              </span>
+              <h2 style={{ fontSize: '32px', margin: '4px 0 16px 0', color: '#0f172a' }}>
+                #{trackedJob.id}
+              </h2>
 
               <div
                 style={{
                   ...getStatusStyle(trackedJob.status),
                   display: 'inline-block',
-                  fontSize: '18px',
-                  padding: '10px 20px',
+                  fontSize: '16px',
+                  padding: '8px 18px',
                   borderRadius: '20px',
                   marginBottom: '20px',
                 }}
@@ -72,11 +82,21 @@ export default function App() {
                 {trackedJob.status}
               </div>
 
-              <div style={styles.trackingDetails}>
-                <p><strong>Customer:</strong> {trackedJob.customer_name}</p>
-                <p><strong>Device:</strong> {trackedJob.device_model}</p>
-                <p><strong>Issue:</strong> {trackedJob.issue || 'General Repair'}</p>
-                <p><strong>Estimated Cost:</strong> LKR {trackedJob.cost}</p>
+              <div style={styles.trackingBox}>
+                <p style={styles.trackingRow}>
+                  <span>Customer:</span> <strong>{trackedJob.customer_name}</strong>
+                </p>
+                <p style={styles.trackingRow}>
+                  <span>Device:</span> <strong>{trackedJob.device_model}</strong>
+                </p>
+                <p style={styles.trackingRow}>
+                  <span>Issue / Fault:</span>{' '}
+                  <strong>{trackedJob.issue || 'General Service'}</strong>
+                </p>
+                <p style={styles.trackingRow}>
+                  <span>Total Amount:</span>{' '}
+                  <strong>LKR {trackedJob.cost || 0}</strong>
+                </p>
               </div>
             </div>
           )}
@@ -85,11 +105,11 @@ export default function App() {
     )
   }
 
-  // --- SHOPKEEPER DASHBOARD VIEW ---
+  // --- SHOPKEEPER DASHBOARD ---
   async function handleAddRepair(e) {
     e.preventDefault()
     if (!customerName || !phoneNumber || !deviceModel) {
-      alert('Please fill in Customer Name, Phone Number, and Device Model.')
+      alert('Please enter Customer Name, Phone Number, and Device Model.')
       return
     }
 
@@ -110,7 +130,7 @@ export default function App() {
     ])
 
     if (error) {
-      alert('Error adding repair job: ' + error.message)
+      alert('Error saving job: ' + error.message)
     } else {
       setCustomerName('')
       setPhoneNumber('')
@@ -135,10 +155,42 @@ export default function App() {
   }
 
   async function deleteRepair(id) {
-    if (!window.confirm(`Are you sure you want to delete Job #${id}?`)) return
+    if (!window.confirm(`Are you sure you want to permanently delete Job #${id}?`))
+      return
     const { error } = await supabase.from('repairs').delete().eq('id', id)
     if (error) alert('Error deleting job: ' + error.message)
-    else fetchRepairs()
+    else {
+      setActiveMenuId(null)
+      fetchRepairs()
+    }
+  }
+
+  async function handleSaveEdit(e) {
+    e.preventDefault()
+    const { id, customer_name, phone_number, device_model, issue, cost } = editingJob
+
+    let formattedPhone = phone_number.trim()
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '94' + formattedPhone.slice(1)
+    }
+
+    const { error } = await supabase
+      .from('repairs')
+      .update({
+        customer_name,
+        phone_number: formattedPhone,
+        device_model,
+        issue,
+        cost: parseInt(cost) || 0,
+      })
+      .eq('id', id)
+
+    if (error) {
+      alert('Error updating job details: ' + error.message)
+    } else {
+      setEditingJob(null)
+      fetchRepairs()
+    }
   }
 
   function sendWhatsAppNotification(job) {
@@ -146,11 +198,11 @@ export default function App() {
 
     let message = ''
     if (job.status === 'Ready') {
-      message = `Hi ${job.customer_name}! Your ${job.device_model} is repaired and ready for pickup! Total: LKR ${job.cost}.\n\nTrack status: ${trackingLink}`
+      message = `Hi ${job.customer_name}! Your ${job.device_model} repair is completed and ready for pickup! Total due: LKR ${job.cost}.\n\nTrack status: ${trackingLink}`
     } else if (job.status === 'In Progress') {
-      message = `Hi ${job.customer_name}! We are currently working on your ${job.device_model} (${job.issue}).\n\nTrack progress live here: ${trackingLink}`
+      message = `Hi ${job.customer_name}! We are working on your ${job.device_model} (${job.issue}).\n\nTrack progress: ${trackingLink}`
     } else {
-      message = `Hi ${job.customer_name}! We received your ${job.device_model} for repair. Job ID: #${job.id}. Cost: LKR ${job.cost}.\n\nTrack your repair status live here: ${trackingLink}`
+      message = `Hi ${job.customer_name}! We received your ${job.device_model} for repair. Job ID: #${job.id}. Cost: LKR ${job.cost}.\n\nTrack status live: ${trackingLink}`
     }
 
     const encodedMessage = encodeURIComponent(message)
@@ -165,23 +217,41 @@ export default function App() {
     return phone
   }
 
-  const filteredRepairs = repairs.filter((job) => {
-    const query = searchQuery.toLowerCase()
-    return (
-      job.customer_name?.toLowerCase().includes(query) ||
-      job.phone_number?.includes(query) ||
-      job.device_model?.toLowerCase().includes(query) ||
-      job.status?.toLowerCase().includes(query)
-    )
-  })
+  // Filter Active vs Completed Jobs
+  const activeJobs = repairs.filter((j) => j.status !== 'Delivered')
+  const completedJobs = repairs.filter((j) => j.status === 'Delivered')
+
+  const displayedJobs = (activeTab === 'active' ? activeJobs : completedJobs).filter(
+    (job) => {
+      const query = searchQuery.toLowerCase()
+      return (
+        job.customer_name?.toLowerCase().includes(query) ||
+        job.phone_number?.includes(query) ||
+        job.device_model?.toLowerCase().includes(query) ||
+        job.status?.toLowerCase().includes(query)
+      )
+    }
+  )
+
+  const totalRevenue = repairs.reduce((acc, curr) => acc + (curr.cost || 0), 0)
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} onClick={() => setActiveMenuId(null)}>
       <header style={styles.header}>
-        <h1 style={{ margin: 0, fontSize: '24px' }}>FixTrack</h1>
-        <p style={{ margin: '4px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
-          Repair Shop Management
-        </p>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '22px' }}>FixTrack</h1>
+          <p style={{ margin: '2px 0 0 0', opacity: 0.9, fontSize: '13px' }}>
+            Repair Shop Dashboard
+          </p>
+        </div>
+        <div style={styles.statsBadge}>
+          <span>
+            Active: <strong>{activeJobs.length}</strong>
+          </span>
+          <span>
+            Total: <strong>LKR {totalRevenue}</strong>
+          </span>
+        </div>
       </header>
 
       {/* NEW REPAIR FORM */}
@@ -229,85 +299,207 @@ export default function App() {
         </form>
       </div>
 
-      {/* ACTIVE REPAIRS LEDGER */}
+      {/* REPAIRS SECTION WITH TABS */}
       <div style={styles.card}>
-        <div style={styles.tableHeaderSection}>
-          <h2 style={styles.cardTitle}>Active Repairs ({filteredRepairs.length})</h2>
-          <input
-            type="text"
-            placeholder="🔍 Search customer, device..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={styles.searchInput}
-          />
+        {/* TABS NAVIGATION */}
+        <div style={styles.tabBar}>
+          <button
+            onClick={() => setActiveTab('active')}
+            style={activeTab === 'active' ? styles.tabActive : styles.tabInactive}
+          >
+            Active Repairs ({activeJobs.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('completed')}
+            style={
+              activeTab === 'completed' ? styles.tabActive : styles.tabInactive
+            }
+          >
+            Completed ({completedJobs.length})
+          </button>
         </div>
 
+        <input
+          type="text"
+          placeholder="🔍 Search customer, device, phone..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={styles.searchInput}
+        />
+
         {loading ? (
-          <p>Loading repairs from database...</p>
-        ) : filteredRepairs.length === 0 ? (
-          <p>No repair jobs found.</p>
+          <p style={{ textAlign: 'center', padding: '20px' }}>
+            Loading database...
+          </p>
+        ) : displayedJobs.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#64748b', padding: '20px' }}>
+            {activeTab === 'active'
+              ? 'No active repair jobs right now.'
+              : 'No completed repairs found.'}
+          </p>
         ) : (
           <div style={styles.jobList}>
-            {filteredRepairs.map((job) => (
+            {displayedJobs.map((job) => (
               <div key={job.id} style={styles.jobCard}>
                 <div style={styles.jobCardHeader}>
-                  <div>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
                     <span style={styles.jobId}>#{job.id}</span>
                     <strong style={{ fontSize: '16px', marginLeft: '8px' }}>
                       {job.customer_name}
                     </strong>
                   </div>
-                  <select
-                    value={job.status}
-                    onChange={(e) => updateStatus(job.id, e.target.value)}
-                    style={getStatusStyle(job.status)}
-                  >
-                    <option value="Received">Received</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Ready">Ready</option>
-                    <option value="Delivered">Delivered</option>
-                  </select>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <select
+                      value={job.status}
+                      onChange={(e) => updateStatus(job.id, e.target.value)}
+                      style={getStatusStyle(job.status)}
+                    >
+                      <option value="Received">Received</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Ready">Ready</option>
+                      <option value="Delivered">Delivered</option>
+                    </select>
+
+                    {/* THREE DOTS MENU */}
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setActiveMenuId(activeMenuId === job.id ? null : job.id)
+                        }}
+                        style={styles.btnMenuDots}
+                      >
+                        ⋮
+                      </button>
+
+                      {activeMenuId === job.id && (
+                        <div style={styles.dropdownMenu}>
+                          <button
+                            onClick={() => {
+                              setEditingJob(job)
+                              setActiveMenuId(null)
+                            }}
+                            style={styles.dropdownItem}
+                          >
+                            ✏️ Edit Details
+                          </button>
+                          <button
+                            onClick={() => deleteRepair(job.id)}
+                            style={{ ...styles.dropdownItem, color: '#ef4444' }}
+                          >
+                            🗑️ Delete Job
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <div style={styles.jobCardBody}>
                   <p style={styles.jobText}>
-                    <strong>📱 Device:</strong> {job.device_model}
+                    <span>📱 Device:</span> <strong>{job.device_model}</strong>
                   </p>
                   <p style={styles.jobText}>
-                    <strong>🔧 Fault:</strong> {job.issue || '-'}
+                    <span>🔧 Fault:</span> <strong>{job.issue || '-'}</strong>
                   </p>
                   <p style={styles.jobText}>
-                    <strong>📞 Phone:</strong> {formatDisplayPhone(job.phone_number)}
+                    <span>📞 Phone:</span>{' '}
+                    <strong>{formatDisplayPhone(job.phone_number)}</strong>
                   </p>
                   <p style={styles.jobText}>
-                    <strong>💰 Cost:</strong> LKR {job.cost || 0}
+                    <span>💰 Cost:</span> <strong>LKR {job.cost || 0}</strong>
                   </p>
                 </div>
 
-                <div style={styles.jobCardActions}>
-                  <button
-                    onClick={() => sendWhatsAppNotification(job)}
-                    disabled={job.status === 'Delivered'}
-                    style={{
-                      ...styles.btnWhatsApp,
-                      opacity: job.status === 'Delivered' ? 0.4 : 1,
-                      cursor: job.status === 'Delivered' ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {job.status === 'Delivered' ? 'Completed' : '💬 Notify Link'}
-                  </button>
-                  <button
-                    onClick={() => deleteRepair(job.id)}
-                    style={styles.btnDelete}
-                  >
-                    🗑️ Delete
-                  </button>
-                </div>
+                {job.status !== 'Delivered' && (
+                  <div style={styles.jobCardActions}>
+                    <button
+                      onClick={() => sendWhatsAppNotification(job)}
+                      style={styles.btnWhatsApp}
+                    >
+                      💬 Send WhatsApp Status Link
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* EDIT MODAL OVERLAY */}
+      {editingJob && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h3 style={{ marginTop: 0 }}>Edit Job #{editingJob.id}</h3>
+            <form onSubmit={handleSaveEdit} style={styles.formGrid}>
+              <label style={styles.label}>Customer Name</label>
+              <input
+                type="text"
+                value={editingJob.customer_name}
+                onChange={(e) =>
+                  setEditingJob({ ...editingJob, customer_name: e.target.value })
+                }
+                style={styles.input}
+              />
+
+              <label style={styles.label}>WhatsApp Phone</label>
+              <input
+                type="text"
+                value={formatDisplayPhone(editingJob.phone_number)}
+                onChange={(e) =>
+                  setEditingJob({ ...editingJob, phone_number: e.target.value })
+                }
+                style={styles.input}
+              />
+
+              <label style={styles.label}>Device Model</label>
+              <input
+                type="text"
+                value={editingJob.device_model}
+                onChange={(e) =>
+                  setEditingJob({ ...editingJob, device_model: e.target.value })
+                }
+                style={styles.input}
+              />
+
+              <label style={styles.label}>Issue / Fault</label>
+              <input
+                type="text"
+                value={editingJob.issue || ''}
+                onChange={(e) =>
+                  setEditingJob({ ...editingJob, issue: e.target.value })
+                }
+                style={styles.input}
+              />
+
+              <label style={styles.label}>Cost (LKR)</label>
+              <input
+                type="number"
+                value={editingJob.cost || ''}
+                onChange={(e) =>
+                  setEditingJob({ ...editingJob, cost: e.target.value })
+                }
+                style={styles.input}
+              />
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button type="submit" style={styles.btnPrimary}>
+                  Save Changes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingJob(null)}
+                  style={styles.btnCancel}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -318,7 +510,7 @@ const styles = {
     backgroundColor: '#f1f5f9',
     minHeight: '100vh',
     padding: '12px',
-    maxWidth: '700px',
+    maxWidth: '650px',
     margin: '0 auto',
     color: '#0f172a',
   },
@@ -328,6 +520,16 @@ const styles = {
     padding: '16px 20px',
     borderRadius: '12px',
     marginBottom: '16px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statsBadge: {
+    display: 'flex',
+    flexDirection: 'column',
+    textAlign: 'right',
+    fontSize: '12px',
+    opacity: 0.95,
   },
   card: {
     backgroundColor: '#ffffff',
@@ -338,29 +540,46 @@ const styles = {
   },
   cardTitle: {
     margin: '0 0 12px 0',
-    fontSize: '18px',
+    fontSize: '17px',
     color: '#0f172a',
+  },
+  tabBar: {
+    display: 'flex',
+    gap: '8px',
+    borderBottom: '2px solid #e2e8f0',
+    paddingBottom: '8px',
+    marginBottom: '12px',
+  },
+  tabActive: {
+    backgroundColor: '#2563eb',
+    color: '#ffffff',
+    border: 'none',
+    padding: '8px 14px',
+    borderRadius: '8px',
+    fontWeight: 'bold',
+    fontSize: '13px',
+    cursor: 'pointer',
+  },
+  tabInactive: {
+    backgroundColor: 'transparent',
+    color: '#64748b',
+    border: 'none',
+    padding: '8px 14px',
+    borderRadius: '8px',
+    fontWeight: '600',
+    fontSize: '13px',
+    cursor: 'pointer',
   },
   formGrid: {
     display: 'flex',
     flexDirection: 'column',
     gap: '10px',
   },
-  input: {
-    padding: '12px',
-    border: '1px solid #cbd5e1',
-    borderRadius: '8px',
-    fontSize: '15px',
-    backgroundColor: '#ffffff',
-    color: '#0f172a',
-    width: '100%',
-    boxSizing: 'border-box',
-  },
-  tableHeaderSection: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-    marginBottom: '12px',
+  label: {
+    fontSize: '12px',
+    fontWeight: 'bold',
+    color: '#475569',
+    marginBottom: '-6px',
   },
   searchInput: {
     padding: '10px 12px',
@@ -369,16 +588,39 @@ const styles = {
     fontSize: '14px',
     width: '100%',
     boxSizing: 'border-box',
+    marginBottom: '14px',
+  },
+  input: {
+    padding: '11px',
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    fontSize: '14px',
+    backgroundColor: '#ffffff',
+    color: '#0f172a',
+    width: '100%',
+    boxSizing: 'border-box',
   },
   btnPrimary: {
     backgroundColor: '#2563eb',
     color: '#fff',
     border: 'none',
-    padding: '12px',
+    padding: '11px',
     borderRadius: '8px',
     cursor: 'pointer',
     fontWeight: 'bold',
-    fontSize: '15px',
+    fontSize: '14px',
+    flex: 1,
+  },
+  btnCancel: {
+    backgroundColor: '#cbd5e1',
+    color: '#334155',
+    border: 'none',
+    padding: '11px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    flex: 1,
   },
   jobList: {
     display: 'flex',
@@ -389,7 +631,8 @@ const styles = {
     border: '1px solid #e2e8f0',
     borderRadius: '10px',
     padding: '14px',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
   },
   jobCardHeader: {
     display: 'flex',
@@ -398,27 +641,58 @@ const styles = {
     marginBottom: '10px',
   },
   jobId: {
-    backgroundColor: '#e2e8f0',
-    padding: '4px 8px',
+    backgroundColor: '#f1f5f9',
+    color: '#334155',
+    padding: '3px 8px',
     borderRadius: '6px',
     fontSize: '13px',
     fontWeight: 'bold',
+  },
+  btnMenuDots: {
+    backgroundColor: 'transparent',
+    border: 'none',
+    fontSize: '20px',
+    fontWeight: 'bold',
+    color: '#64748b',
+    cursor: 'pointer',
+    padding: '0 6px',
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    right: 0,
+    top: '28px',
+    backgroundColor: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    zIndex: 10,
+    minWidth: '130px',
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    width: '100%',
+    padding: '10px 12px',
+    border: 'none',
+    backgroundColor: 'transparent',
+    textAlign: 'left',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    display: 'block',
   },
   jobCardBody: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: '6px',
-    marginBottom: '12px',
+    marginBottom: '10px',
   },
   jobText: {
     margin: 0,
-    fontSize: '14px',
+    fontSize: '13px',
     color: '#334155',
   },
   jobCardActions: {
-    display: 'flex',
-    gap: '10px',
-    borderTop: '1px solid #e2e8f0',
+    borderTop: '1px solid #f1f5f9',
     paddingTop: '10px',
   },
   btnWhatsApp: {
@@ -428,26 +702,44 @@ const styles = {
     padding: '10px',
     borderRadius: '8px',
     fontWeight: 'bold',
-    flex: 2,
-    fontSize: '14px',
-  },
-  btnDelete: {
-    backgroundColor: '#ef4444',
-    color: '#fff',
-    border: 'none',
-    padding: '10px',
-    borderRadius: '8px',
-    fontWeight: 'bold',
-    flex: 1,
+    width: '100%',
+    fontSize: '13px',
     cursor: 'pointer',
-    fontSize: '14px',
   },
-  trackingDetails: {
+  trackingBox: {
     textAlign: 'left',
     backgroundColor: '#f8fafc',
-    padding: '16px',
+    padding: '14px',
     borderRadius: '10px',
-    lineHeight: '1.8',
+    border: '1px solid #e2e8f0',
+  },
+  trackingRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    margin: '8px 0',
+    fontSize: '14px',
+    color: '#334155',
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+    padding: '16px',
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    padding: '20px',
+    borderRadius: '12px',
+    width: '100%',
+    maxWidth: '450px',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
   },
 }
 
@@ -463,10 +755,10 @@ function getStatusStyle(status) {
     backgroundColor: bg,
     color: color,
     border: 'none',
-    padding: '6px 12px',
+    padding: '5px 10px',
     borderRadius: '6px',
     fontWeight: 'bold',
     cursor: 'pointer',
-    fontSize: '13px',
+    fontSize: '12px',
   }
 }
