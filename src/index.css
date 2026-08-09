@@ -1,0 +1,13 @@
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+h2 {
+  color: #0f172a !important;
+}
