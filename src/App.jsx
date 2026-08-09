@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 
 export default function App() {
+  // Simple routing check for Customer Tracking Link (?track=JOB_ID)
+  const urlParams = new URLSearchParams(window.location.search)
+  const trackingJobId = urlParams.get('track')
+
   const [repairs, setRepairs] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -32,6 +36,56 @@ export default function App() {
     setLoading(false)
   }
 
+  // --- CUSTOMER TRACKING VIEW ---
+  if (trackingJobId) {
+    const trackedJob = repairs.find((j) => j.id.toString() === trackingJobId)
+
+    return (
+      <div style={styles.container}>
+        <header style={styles.header}>
+          <h1 style={{ margin: 0 }}>FixTrack</h1>
+          <p style={{ margin: '5px 0 0 0', opacity: 0.9 }}>Customer Status Tracker</p>
+        </header>
+
+        <div style={styles.card}>
+          {loading ? (
+            <p style={{ textAlign: 'center' }}>Loading status...</p>
+          ) : !trackedJob ? (
+            <p style={{ textAlign: 'center', color: '#ef4444' }}>
+              Repair Job #{trackingJobId} not found. Please verify your link.
+            </p>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '10px' }}>
+              <span style={{ fontSize: '14px', color: '#64748b' }}>Repair Job ID</span>
+              <h2 style={{ fontSize: '28px', margin: '5px 0 15px 0' }}>#{trackedJob.id}</h2>
+
+              <div
+                style={{
+                  ...getStatusStyle(trackedJob.status),
+                  display: 'inline-block',
+                  fontSize: '18px',
+                  padding: '10px 20px',
+                  borderRadius: '20px',
+                  marginBottom: '20px',
+                }}
+              >
+                {trackedJob.status}
+              </div>
+
+              <div style={styles.trackingDetails}>
+                <p><strong>Customer:</strong> {trackedJob.customer_name}</p>
+                <p><strong>Device:</strong> {trackedJob.device_model}</p>
+                <p><strong>Issue:</strong> {trackedJob.issue || 'General Repair'}</p>
+                <p><strong>Estimated Cost:</strong> LKR {trackedJob.cost}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // --- SHOPKEEPER DASHBOARD VIEW ---
   async function handleAddRepair(e) {
     e.preventDefault()
     if (!customerName || !phoneNumber || !deviceModel) {
@@ -82,32 +136,35 @@ export default function App() {
 
   async function deleteRepair(id) {
     if (!window.confirm(`Are you sure you want to delete Job #${id}?`)) return
-
     const { error } = await supabase.from('repairs').delete().eq('id', id)
-
-    if (error) {
-      alert('Error deleting job: ' + error.message)
-    } else {
-      fetchRepairs()
-    }
+    if (error) alert('Error deleting job: ' + error.message)
+    else fetchRepairs()
   }
 
   function sendWhatsAppNotification(job) {
+    const trackingLink = `${window.location.origin}?track=${job.id}`
+
     let message = ''
     if (job.status === 'Ready') {
-      message = `Hi ${job.customer_name}! Your ${job.device_model} repair is completed and ready for pickup at our shop. Total amount due: LKR ${job.cost}. Thank you!`
+      message = `Hi ${job.customer_name}! Your ${job.device_model} is repaired and ready for pickup! Total: LKR ${job.cost}.\n\nTrack status: ${trackingLink}`
     } else if (job.status === 'In Progress') {
-      message = `Hi ${job.customer_name}! We are currently working on your ${job.device_model} (${job.issue}). We will update you once it is ready.`
+      message = `Hi ${job.customer_name}! We are currently working on your ${job.device_model} (${job.issue}).\n\nTrack progress live here: ${trackingLink}`
     } else {
-      message = `Hi ${job.customer_name}! We have received your ${job.device_model} for repair. Job ID: #${job.id}. Estimated cost: LKR ${job.cost}.`
+      message = `Hi ${job.customer_name}! We received your ${job.device_model} for repair. Job ID: #${job.id}. Cost: LKR ${job.cost}.\n\nTrack your repair status live here: ${trackingLink}`
     }
 
     const encodedMessage = encodeURIComponent(message)
-    const whatsappUrl = `https://wa.me/${job.phone_number}?text=${encodedMessage}`
-    window.open(whatsappUrl, '_blank')
+    window.open(`https://wa.me/${job.phone_number}?text=${encodedMessage}`, '_blank')
   }
 
-  // Filter jobs based on search input
+  function formatDisplayPhone(phone) {
+    if (!phone) return ''
+    if (phone.startsWith('94') && phone.length === 11) {
+      return '0' + phone.slice(2)
+    }
+    return phone
+  }
+
   const filteredRepairs = repairs.filter((job) => {
     const query = searchQuery.toLowerCase()
     return (
@@ -121,13 +178,15 @@ export default function App() {
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <h1 style={{ margin: 0 }}>FixTrack</h1>
-        <p style={{ margin: '5px 0 0 0', opacity: 0.9 }}>Repair Shop Dashboard</p>
+        <h1 style={{ margin: 0, fontSize: '24px' }}>FixTrack</h1>
+        <p style={{ margin: '4px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+          Repair Shop Management
+        </p>
       </header>
 
       {/* NEW REPAIR FORM */}
       <div style={styles.card}>
-        <h2>Log New Repair Job</h2>
+        <h2 style={styles.cardTitle}>Log New Repair Job</h2>
         <form onSubmit={handleAddRepair} style={styles.formGrid}>
           <input
             type="text"
@@ -173,10 +232,10 @@ export default function App() {
       {/* ACTIVE REPAIRS LEDGER */}
       <div style={styles.card}>
         <div style={styles.tableHeaderSection}>
-          <h2>Active Repair Jobs ({filteredRepairs.length})</h2>
+          <h2 style={styles.cardTitle}>Active Repairs ({filteredRepairs.length})</h2>
           <input
             type="text"
-            placeholder="🔍 Search customer, phone, device..."
+            placeholder="🔍 Search customer, device..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={styles.searchInput}
@@ -186,66 +245,66 @@ export default function App() {
         {loading ? (
           <p>Loading repairs from database...</p>
         ) : filteredRepairs.length === 0 ? (
-          <p>No matching repair jobs found.</p>
+          <p>No repair jobs found.</p>
         ) : (
-          <div style={styles.tableWrapper}>
-            <table style={styles.table}>
-              <thead>
-                <tr style={{ backgroundColor: '#f1f5f9', textAlign: 'left' }}>
-                  <th style={styles.th}>Job #</th>
-                  <th style={styles.th}>Customer</th>
-                  <th style={styles.th}>Device</th>
-                  <th style={styles.th}>Issue</th>
-                  <th style={styles.th}>Cost (LKR)</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRepairs.map((job) => (
-                  <tr key={job.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={styles.td}>#{job.id}</td>
-                    <td style={styles.td}>
-                      <strong>{job.customer_name}</strong>
-                      <br />
-                      <small style={{ color: '#64748b' }}>{job.phone_number}</small>
-                    </td>
-                    <td style={styles.td}>{job.device_model}</td>
-                    <td style={styles.td}>{job.issue || '-'}</td>
-                    <td style={styles.td}>{job.cost ? `LKR ${job.cost}` : '-'}</td>
-                    <td style={styles.td}>
-                      <select
-                        value={job.status}
-                        onChange={(e) => updateStatus(job.id, e.target.value)}
-                        style={getStatusStyle(job.status)}
-                      >
-                        <option value="Received">Received</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Ready">Ready</option>
-                        <option value="Delivered">Delivered</option>
-                      </select>
-                    </td>
-                    <td style={styles.td}>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          onClick={() => sendWhatsAppNotification(job)}
-                          style={styles.btnWhatsApp}
-                        >
-                          💬 Notify
-                        </button>
-                        <button
-                          onClick={() => deleteRepair(job.id)}
-                          style={styles.btnDelete}
-                          title="Delete Job"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div style={styles.jobList}>
+            {filteredRepairs.map((job) => (
+              <div key={job.id} style={styles.jobCard}>
+                <div style={styles.jobCardHeader}>
+                  <div>
+                    <span style={styles.jobId}>#{job.id}</span>
+                    <strong style={{ fontSize: '16px', marginLeft: '8px' }}>
+                      {job.customer_name}
+                    </strong>
+                  </div>
+                  <select
+                    value={job.status}
+                    onChange={(e) => updateStatus(job.id, e.target.value)}
+                    style={getStatusStyle(job.status)}
+                  >
+                    <option value="Received">Received</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Ready">Ready</option>
+                    <option value="Delivered">Delivered</option>
+                  </select>
+                </div>
+
+                <div style={styles.jobCardBody}>
+                  <p style={styles.jobText}>
+                    <strong>📱 Device:</strong> {job.device_model}
+                  </p>
+                  <p style={styles.jobText}>
+                    <strong>🔧 Fault:</strong> {job.issue || '-'}
+                  </p>
+                  <p style={styles.jobText}>
+                    <strong>📞 Phone:</strong> {formatDisplayPhone(job.phone_number)}
+                  </p>
+                  <p style={styles.jobText}>
+                    <strong>💰 Cost:</strong> LKR {job.cost || 0}
+                  </p>
+                </div>
+
+                <div style={styles.jobCardActions}>
+                  <button
+                    onClick={() => sendWhatsAppNotification(job)}
+                    disabled={job.status === 'Delivered'}
+                    style={{
+                      ...styles.btnWhatsApp,
+                      opacity: job.status === 'Delivered' ? 0.4 : 1,
+                      cursor: job.status === 'Delivered' ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {job.status === 'Delivered' ? 'Completed' : '💬 Notify Link'}
+                  </button>
+                  <button
+                    onClick={() => deleteRepair(job.id)}
+                    style={styles.btnDelete}
+                  >
+                    🗑️ Delete
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -256,104 +315,139 @@ export default function App() {
 const styles = {
   container: {
     fontFamily: 'system-ui, -apple-system, sans-serif',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f1f5f9',
     minHeight: '100vh',
-    padding: '16px',
-    maxWidth: '1000px',
+    padding: '12px',
+    maxWidth: '700px',
     margin: '0 auto',
     color: '#0f172a',
   },
   header: {
     backgroundColor: '#2563eb',
     color: '#ffffff',
-    padding: '20px',
-    borderRadius: '10px',
-    marginBottom: '20px',
+    padding: '16px 20px',
+    borderRadius: '12px',
+    marginBottom: '16px',
   },
   card: {
     backgroundColor: '#ffffff',
-    padding: '20px',
-    borderRadius: '10px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    marginBottom: '20px',
+    padding: '16px',
+    borderRadius: '12px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+    marginBottom: '16px',
+  },
+  cardTitle: {
+    margin: '0 0 12px 0',
+    fontSize: '18px',
     color: '#0f172a',
   },
   formGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    display: 'flex',
+    flexDirection: 'column',
     gap: '10px',
+  },
+  input: {
+    padding: '12px',
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    fontSize: '15px',
+    backgroundColor: '#ffffff',
+    color: '#0f172a',
+    width: '100%',
+    boxSizing: 'border-box',
   },
   tableHeaderSection: {
     display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
     gap: '10px',
-    marginBottom: '15px',
+    marginBottom: '12px',
   },
   searchInput: {
-    padding: '8px 12px',
+    padding: '10px 12px',
     border: '1px solid #cbd5e1',
-    borderRadius: '6px',
+    borderRadius: '8px',
     fontSize: '14px',
     width: '100%',
-    maxWidth: '280px',
-    backgroundColor: '#ffffff',
-    color: '#0f172a',
-  },
-  input: {
-    padding: '10px',
-    border: '1px solid #cbd5e1',
-    borderRadius: '6px',
-    fontSize: '14px',
-    backgroundColor: '#ffffff',
-    color: '#0f172a',
+    boxSizing: 'border-box',
   },
   btnPrimary: {
     backgroundColor: '#2563eb',
     color: '#fff',
     border: 'none',
-    padding: '10px 15px',
-    borderRadius: '6px',
+    padding: '12px',
+    borderRadius: '8px',
     cursor: 'pointer',
     fontWeight: 'bold',
+    fontSize: '15px',
+  },
+  jobList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  jobCard: {
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+    padding: '14px',
+    backgroundColor: '#f8fafc',
+  },
+  jobCardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '10px',
+  },
+  jobId: {
+    backgroundColor: '#e2e8f0',
+    padding: '4px 8px',
+    borderRadius: '6px',
+    fontSize: '13px',
+    fontWeight: 'bold',
+  },
+  jobCardBody: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '6px',
+    marginBottom: '12px',
+  },
+  jobText: {
+    margin: 0,
+    fontSize: '14px',
+    color: '#334155',
+  },
+  jobCardActions: {
+    display: 'flex',
+    gap: '10px',
+    borderTop: '1px solid #e2e8f0',
+    paddingTop: '10px',
   },
   btnWhatsApp: {
     backgroundColor: '#22c55e',
     color: '#fff',
     border: 'none',
-    padding: '6px 12px',
-    borderRadius: '6px',
-    cursor: 'pointer',
+    padding: '10px',
+    borderRadius: '8px',
     fontWeight: 'bold',
-    fontSize: '13px',
+    flex: 2,
+    fontSize: '14px',
   },
   btnDelete: {
     backgroundColor: '#ef4444',
     color: '#fff',
     border: 'none',
-    padding: '6px 10px',
-    borderRadius: '6px',
+    padding: '10px',
+    borderRadius: '8px',
+    fontWeight: 'bold',
+    flex: 1,
     cursor: 'pointer',
+    fontSize: '14px',
   },
-  tableWrapper: {
-    overflowX: 'auto',
-    WebkitOverflowScrolling: 'touch',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    minWidth: '650px',
-    color: '#0f172a',
-  },
-  th: {
-    padding: '10px',
-    borderBottom: '2px solid #cbd5e1',
-    color: '#0f172a',
-  },
-  td: {
-    padding: '10px',
-    color: '#0f172a',
+  trackingDetails: {
+    textAlign: 'left',
+    backgroundColor: '#f8fafc',
+    padding: '16px',
+    borderRadius: '10px',
+    lineHeight: '1.8',
   },
 }
 
@@ -369,9 +463,10 @@ function getStatusStyle(status) {
     backgroundColor: bg,
     color: color,
     border: 'none',
-    padding: '6px 10px',
+    padding: '6px 12px',
     borderRadius: '6px',
     fontWeight: 'bold',
     cursor: 'pointer',
+    fontSize: '13px',
   }
 }
