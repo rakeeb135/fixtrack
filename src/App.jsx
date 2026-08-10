@@ -19,6 +19,7 @@ export default function App() {
 
   // Dashboard State
   const [repairs, setRepairs] = useState([])
+  const [trackedJob, setTrackedJob] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('active')
   const [searchQuery, setSearchQuery] = useState('')
@@ -33,6 +34,8 @@ export default function App() {
   const [newShopPlan, setNewShopPlan] = useState('trial')
   const [editingRateProfile, setEditingRateProfile] = useState(null)
   const [customRateInput, setCustomRateInput] = useState('')
+  const [editingDateProfile, setEditingDateProfile] = useState(null)
+  const [customDateInput, setCustomDateInput] = useState('')
 
   // New Job Form State
   const [customerName, setCustomerName] = useState('')
@@ -85,8 +88,11 @@ export default function App() {
     setAuthLoading(false)
   }
 
+  // Fetch Public Tracked Job or Shop's Isolated Repairs
   useEffect(() => {
-    if (session || trackingJobId) {
+    if (trackingJobId) {
+      fetchTrackedJob(trackingJobId)
+    } else if (session) {
       fetchRepairs()
     }
   }, [session, trackingJobId])
@@ -96,6 +102,15 @@ export default function App() {
       fetchAllProfiles()
     }
   }, [profile])
+
+  async function fetchTrackedJob(jobId) {
+    setLoading(true)
+    const { data, error } = await supabase.rpc('get_tracked_job', { job_id: parseInt(jobId) })
+    if (!error && data && data.length > 0) {
+      setTrackedJob(data[0])
+    }
+    setLoading(false)
+  }
 
   async function fetchRepairs() {
     setLoading(true)
@@ -210,7 +225,6 @@ export default function App() {
         },
       ])
 
-      // Re-establish Admin Session
       await supabase.auth.setSession({
         access_token: session.access_token,
         refresh_token: session.refresh_token,
@@ -241,6 +255,27 @@ export default function App() {
 
     if (error) alert('Error extending subscription: ' + error.message)
     else fetchAllProfiles()
+  }
+
+  async function saveCustomExpiryDate(e) {
+    e.preventDefault()
+    if (!customDateInput) return
+
+    const newExpiry = new Date(customDateInput).toISOString()
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        status: 'active',
+        expiry_date: newExpiry,
+      })
+      .eq('id', editingDateProfile.id)
+
+    if (error) alert('Error updating expiry date: ' + error.message)
+    else {
+      setEditingDateProfile(null)
+      fetchAllProfiles()
+    }
   }
 
   async function toggleShopStatus(targetProfile) {
@@ -326,8 +361,6 @@ export default function App() {
 
   // --- PUBLIC TRACKING VIEW ---
   if (trackingJobId) {
-    const trackedJob = repairsWithShopNum.find((j) => j.id.toString() === trackingJobId)
-
     return (
       <div style={styles.container}>
         <header style={styles.header}>
@@ -347,10 +380,10 @@ export default function App() {
           ) : (
             <div style={{ textAlign: 'center', padding: '10px 5px' }}>
               <span style={{ fontSize: '13px', color: '#64748b' }}>
-                Shop Ticket Number
+                Repair Reference
               </span>
               <h2 style={{ fontSize: '32px', margin: '4px 0 16px 0', color: '#0f172a' }}>
-                #{trackedJob.shopNum}
+                #{trackedJob.id}
               </h2>
 
               <div
@@ -735,6 +768,16 @@ export default function App() {
                         </button>
                         <button
                           onClick={() => {
+                            setEditingDateProfile(p)
+                            const currentIso = p.expiry_date ? new Date(p.expiry_date).toISOString().slice(0, 10) : ''
+                            setCustomDateInput(currentIso)
+                          }}
+                          style={styles.btnQuickAdd}
+                        >
+                          📅 Set Date
+                        </button>
+                        <button
+                          onClick={() => {
                             setEditingRateProfile(p)
                             setCustomRateInput(p.monthly_rate ? p.monthly_rate.toString() : '2000')
                           }}
@@ -998,6 +1041,37 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setEditingJob(null)}
+                  style={styles.btnCancel}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT EXPIRY DATE MODAL (ADMIN) */}
+      {editingDateProfile && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h3 style={{ marginTop: 0 }}>Set Custom Expiry Date for {editingDateProfile.email}</h3>
+            <form onSubmit={saveCustomExpiryDate} style={styles.formGrid}>
+              <label style={styles.label}>Select Expiry Date</label>
+              <input
+                type="date"
+                value={customDateInput}
+                onChange={(e) => setCustomDateInput(e.target.value)}
+                style={styles.input}
+                required
+              />
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button type="submit" style={styles.btnPrimary}>
+                  Save Expiry Date
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingDateProfile(null)}
                   style={styles.btnCancel}
                 >
                   Cancel
