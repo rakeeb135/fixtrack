@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 
 const MASTER_ADMIN_EMAIL = 'rakeebroomy@gmail.com'
-const YOUR_WHATSAPP_NUMBER = '94772795212' // Your phone number for receipts
+const YOUR_WHATSAPP_NUMBER = '94772795212'
 
 export default function App() {
   const urlParams = new URLSearchParams(window.location.search)
@@ -26,13 +26,13 @@ export default function App() {
   const [editingJob, setEditingJob] = useState(null)
 
   // Admin Dashboard State
-  const [adminView, setAdminView] = useState(false)
   const [allProfiles, setAllProfiles] = useState([])
   const [newShopEmail, setNewShopEmail] = useState('')
   const [newShopPassword, setNewShopPassword] = useState('')
-  const [newShopRate, setNewShopRate] = useState(2000)
+  const [newShopRate, setNewShopRate] = useState('2000')
   const [newShopPlan, setNewShopPlan] = useState('trial')
   const [editingRateProfile, setEditingRateProfile] = useState(null)
+  const [customRateInput, setCustomRateInput] = useState('')
 
   // New Job Form State
   const [customerName, setCustomerName] = useState('')
@@ -41,7 +41,6 @@ export default function App() {
   const [issue, setIssue] = useState('')
   const [cost, setCost] = useState('')
 
-  // Check auth session on startup
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
@@ -64,18 +63,15 @@ export default function App() {
   }, [])
 
   async function fetchUserProfile(user) {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single()
 
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching profile:', error)
-    } else if (data) {
+    if (data) {
       setProfile(data)
     } else {
-      // Fallback if profile trigger is pending
       const isAdmin = user.email === MASTER_ADMIN_EMAIL
       setProfile({
         id: user.id,
@@ -89,7 +85,6 @@ export default function App() {
     setAuthLoading(false)
   }
 
-  // Fetch repairs when authenticated or when tracking a job
   useEffect(() => {
     if (session || trackingJobId) {
       fetchRepairs()
@@ -104,29 +99,24 @@ export default function App() {
 
   async function fetchRepairs() {
     setLoading(true)
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('repairs')
       .select('*')
       .order('id', { ascending: true })
 
-    if (error) {
-      console.error('Error fetching repairs:', error)
-    } else {
-      setRepairs(data || [])
-    }
+    setRepairs(data || [])
     setLoading(false)
   }
 
   async function fetchAllProfiles() {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (!error) setAllProfiles(data || [])
+    setAllProfiles(data || [])
   }
 
-  // Helper formatting functions
   function formatDate(isoString) {
     if (!isoString) return ''
     const d = new Date(isoString)
@@ -148,7 +138,6 @@ export default function App() {
     return phone
   }
 
-  // Calculate Days Remaining
   function getDaysRemaining() {
     if (!profile?.expiry_date) return 999
     const diffTime = new Date(profile.expiry_date) - new Date()
@@ -159,7 +148,6 @@ export default function App() {
   const isExpired = profile?.role !== 'admin' && (daysLeft <= 0 || profile?.status === 'suspended')
   const isNearExpiry = profile?.role !== 'admin' && daysLeft > 0 && daysLeft <= 3
 
-  // Map each shop's repairs to a relative #1, #2, #3 numbering
   const repairsWithShopNum = repairs.map((job, idx) => ({
     ...job,
     shopNum: idx + 1,
@@ -169,7 +157,7 @@ export default function App() {
   const activeJobs = sortedRepairs.filter((j) => j.status !== 'Delivered')
   const completedJobs = sortedRepairs.filter((j) => j.status === 'Delivered')
 
-  // --- AUTHENTICATION HANDLERS ---
+  // --- AUTH HANDLERS ---
   async function handleLogin(e) {
     e.preventDefault()
     setAuthError('')
@@ -184,16 +172,17 @@ export default function App() {
     await supabase.auth.signOut()
     setRepairs([])
     setProfile(null)
-    setAdminView(false)
   }
 
   // --- ADMIN ACTIONS ---
   async function handleCreateShopAccount(e) {
     e.preventDefault()
     if (!newShopEmail || !newShopPassword) {
-      alert('Please enter shop email and password.')
+      alert('Please fill out all fields.')
       return
     }
+
+    const currentAdminUser = session.user
 
     const initialExpiry = newShopPlan === 'trial'
       ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
@@ -205,7 +194,7 @@ export default function App() {
     })
 
     if (error) {
-      alert('Error creating account: ' + error.message)
+      alert('Error creating user: ' + error.message)
       return
     }
 
@@ -221,9 +210,16 @@ export default function App() {
         },
       ])
 
+      // Re-establish Admin Session
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      })
+
       alert(`Account created successfully for ${newShopEmail}!`)
       setNewShopEmail('')
       setNewShopPassword('')
+      fetchUserProfile(currentAdminUser)
       fetchAllProfiles()
     }
   }
@@ -232,7 +228,6 @@ export default function App() {
     const currentExpiry = new Date(targetProfile.expiry_date || Date.now())
     const now = new Date()
 
-    // Early renewal adds onto current expiry; late renewal starts from today
     const baseDate = currentExpiry > now ? currentExpiry : now
     const newExpiry = new Date(baseDate.setMonth(baseDate.getMonth() + monthsToAdd)).toISOString()
 
@@ -261,9 +256,10 @@ export default function App() {
 
   async function updateMonthlyRate(e) {
     e.preventDefault()
+    const parsedRate = parseInt(customRateInput, 10) || 0
     const { error } = await supabase
       .from('profiles')
-      .update({ monthly_rate: parseInt(editingRateProfile.monthly_rate) || 2000 })
+      .update({ monthly_rate: parsedRate })
       .eq('id', editingRateProfile.id)
 
     if (error) alert('Error updating rate: ' + error.message)
@@ -274,7 +270,7 @@ export default function App() {
   }
 
   async function deleteShopAccount(targetProfile) {
-    if (!window.confirm(`⚠️ ARE YOU SURE? This will permanently delete ${targetProfile.email} and ALL their repair records!`))
+    if (!window.confirm(`⚠️ ARE YOU SURE? Delete ${targetProfile.email} and all data?`))
       return
 
     const { error } = await supabase.from('profiles').delete().eq('id', targetProfile.id)
@@ -282,7 +278,6 @@ export default function App() {
     else fetchAllProfiles()
   }
 
-  // --- CLEAN CSV EXPORT FUNCTION ---
   function exportToCSV() {
     if (repairs.length === 0) {
       alert('No repair data available to export.')
@@ -329,7 +324,7 @@ export default function App() {
     window.open(`https://wa.me/${YOUR_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
-  // --- CUSTOMER TRACKING VIEW (Public Access) ---
+  // --- PUBLIC TRACKING VIEW ---
   if (trackingJobId) {
     const trackedJob = repairsWithShopNum.find((j) => j.id.toString() === trackingJobId)
 
@@ -398,23 +393,23 @@ export default function App() {
     )
   }
 
-  // --- LOGIN SCREEN FOR SHOPKEEPERS ---
   if (authLoading) {
     return <div style={{ textAlign: 'center', padding: '50px' }}>Loading FixTrack...</div>
   }
 
+  // --- LOGIN SCREEN ---
   if (!session) {
     return (
       <div style={styles.container}>
         <header style={styles.header}>
           <h1 style={{ margin: 0, fontSize: '22px' }}>FixTrack</h1>
           <p style={{ margin: '4px 0 0 0', opacity: 0.9, fontSize: '13px' }}>
-            Shopkeeper Sign In
+            Portal Sign In
           </p>
         </header>
 
         <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Sign In to Your Shop Account</h2>
+          <h2 style={styles.cardTitle}>Sign In to Account</h2>
           {authError && (
             <div style={{ color: '#ef4444', marginBottom: '10px', fontSize: '14px' }}>
               {authError}
@@ -424,7 +419,7 @@ export default function App() {
             <label style={styles.label}>Email Address</label>
             <input
               type="email"
-              placeholder="shop@example.com"
+              placeholder="user@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               style={styles.input}
@@ -450,7 +445,7 @@ export default function App() {
     )
   }
 
-  // --- PAUSED / EXPIRED LOCK SCREEN ---
+  // --- EXPIRED LOCK SCREEN ---
   if (isExpired) {
     return (
       <div style={styles.container}>
@@ -501,7 +496,7 @@ export default function App() {
     )
   }
 
-  // --- DASHBOARD FUNCTIONS ---
+  // --- SHOPKEEPER DASHBOARD FUNCTIONS ---
   async function handleAddRepair(e) {
     e.preventDefault()
     if (!customerName || !phoneNumber || !deviceModel) {
@@ -544,19 +539,14 @@ export default function App() {
       .update({ status: newStatus })
       .eq('id', id)
 
-    if (error) {
-      alert('Error updating status: ' + error.message)
-    } else {
-      fetchRepairs()
-    }
+    if (!error) fetchRepairs()
   }
 
   async function deleteRepair(id) {
     if (!window.confirm(`Are you sure you want to permanently delete this job?`))
       return
     const { error } = await supabase.from('repairs').delete().eq('id', id)
-    if (error) alert('Error deleting job: ' + error.message)
-    else {
+    if (!error) {
       setActiveMenuId(null)
       fetchRepairs()
     }
@@ -582,9 +572,7 @@ export default function App() {
       })
       .eq('id', id)
 
-    if (error) {
-      alert('Error updating job details: ' + error.message)
-    } else {
+    if (!error) {
       setEditingJob(null)
       fetchRepairs()
     }
@@ -602,8 +590,7 @@ export default function App() {
       message = `Hi ${job.customer_name}! We received your ${job.device_model} for repair. Cost: LKR ${job.cost}.\n\nTrack status live: ${trackingLink}`
     }
 
-    const encodedMessage = encodeURIComponent(message)
-    window.open(`https://wa.me/${job.phone_number}?text=${encodedMessage}`, '_blank')
+    window.open(`https://wa.me/${job.phone_number}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
   const displayedJobs = (activeTab === 'active' ? activeJobs : completedJobs).filter(
@@ -625,19 +612,11 @@ export default function App() {
         <div>
           <h1 style={{ margin: 0, fontSize: '22px' }}>FixTrack</h1>
           <p style={{ margin: '2px 0 0 0', opacity: 0.9, fontSize: '12px' }}>
-            {session.user.email} {profile?.role === 'admin' && '👑 (Admin)'}
+            {session.user.email} {profile?.role === 'admin' && '👑 (Master Admin)'}
           </p>
         </div>
         <div style={{ textAlign: 'right', display: 'flex', gap: '6px', alignItems: 'center' }}>
-          {profile?.role === 'admin' && (
-            <button
-              onClick={() => setAdminView(!adminView)}
-              style={adminView ? styles.btnAdminActive : styles.btnAdmin}
-            >
-              {adminView ? '📱 App View' : '⚙️ Admin Panel'}
-            </button>
-          )}
-          {!adminView && (
+          {profile?.role !== 'admin' && (
             <button onClick={exportToCSV} style={styles.btnExport} title="Export to Excel / CSV">
               📥 Export
             </button>
@@ -648,8 +627,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* NEAR EXPIRY WARNING BANNER */}
-      {isNearExpiry && !adminView && (
+      {/* WARNING BANNER */}
+      {isNearExpiry && (
         <div style={styles.warningBanner}>
           <div>
             <strong>👋 Subscription Renews in {daysLeft} Day{daysLeft > 1 ? 's' : ''}!</strong>
@@ -663,10 +642,10 @@ export default function App() {
         </div>
       )}
 
-      {/* --- MASTER ADMIN PANEL VIEW --- */}
-      {profile?.role === 'admin' && adminView ? (
+      {/* --- MASTER ADMIN DASHBOARD VIEW --- */}
+      {profile?.role === 'admin' ? (
         <div>
-          {/* CREATE NEW SHOP ACCOUNT */}
+          {/* ONBOARD SHOP */}
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>➕ Onboard New Shopkeeper</h2>
             <form onSubmit={handleCreateShopAccount} style={styles.formGrid}>
@@ -688,7 +667,7 @@ export default function App() {
               />
               <div style={{ display: 'flex', gap: '10px' }}>
                 <input
-                  type="number"
+                  type="text"
                   placeholder="Monthly Rate (LKR)"
                   value={newShopRate}
                   onChange={(e) => setNewShopRate(e.target.value)}
@@ -709,7 +688,7 @@ export default function App() {
             </form>
           </div>
 
-          {/* ALL SHOPS LIST */}
+          {/* ALL CLIENT SHOPS */}
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>📊 Client Shops ({allProfiles.length})</h2>
             <div style={styles.jobList}>
@@ -731,8 +710,8 @@ export default function App() {
                       </div>
                       <span
                         style={{
-                          backgroundColor: pExpired ? '#fecdd3' : '#bbf7d0',
-                          color: pExpired ? '#9f1239' : '#166534',
+                          backgroundColor: p.role === 'admin' ? '#dbeafe' : pExpired ? '#fecdd3' : '#bbf7d0',
+                          color: p.role === 'admin' ? '#1e40af' : pExpired ? '#9f1239' : '#166534',
                           padding: '3px 8px',
                           borderRadius: '6px',
                           fontSize: '11px',
@@ -754,7 +733,13 @@ export default function App() {
                         <button onClick={() => extendSubscription(p, 12)} style={styles.btnQuickAdd}>
                           +1 Yr
                         </button>
-                        <button onClick={() => setEditingRateProfile(p)} style={styles.btnEditRate}>
+                        <button
+                          onClick={() => {
+                            setEditingRateProfile(p)
+                            setCustomRateInput(p.monthly_rate ? p.monthly_rate.toString() : '2000')
+                          }}
+                          style={styles.btnEditRate}
+                        >
                           ✏️ Rate
                         </button>
                         <button onClick={() => toggleShopStatus(p)} style={styles.btnToggleStatus}>
@@ -774,7 +759,6 @@ export default function App() {
       ) : (
         /* --- REGULAR SHOPKEEPER DASHBOARD --- */
         <div>
-          {/* NEW REPAIR FORM */}
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>Log New Repair Job</h2>
             <form onSubmit={handleAddRepair} style={styles.formGrid}>
@@ -821,7 +805,6 @@ export default function App() {
             </form>
           </div>
 
-          {/* REPAIRS SECTION WITH TABS */}
           <div style={styles.card}>
             <div style={styles.tabBar}>
               <button
@@ -1033,12 +1016,11 @@ export default function App() {
             <form onSubmit={updateMonthlyRate} style={styles.formGrid}>
               <label style={styles.label}>Monthly Rate (LKR)</label>
               <input
-                type="number"
-                value={editingRateProfile.monthly_rate || 2000}
-                onChange={(e) =>
-                  setEditingRateProfile({ ...editingRateProfile, monthly_rate: e.target.value })
-                }
+                type="text"
+                value={customRateInput}
+                onChange={(e) => setCustomRateInput(e.target.value)}
                 style={styles.input}
+                placeholder="2000"
                 required
               />
               <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
@@ -1179,26 +1161,6 @@ const styles = {
   btnExport: {
     backgroundColor: '#10b981',
     color: '#ffffff',
-    border: 'none',
-    padding: '6px 10px',
-    borderRadius: '6px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    fontSize: '12px',
-  },
-  btnAdmin: {
-    backgroundColor: '#f59e0b',
-    color: '#ffffff',
-    border: 'none',
-    padding: '6px 10px',
-    borderRadius: '6px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    fontSize: '12px',
-  },
-  btnAdminActive: {
-    backgroundColor: '#ffffff',
-    color: '#2563eb',
     border: 'none',
     padding: '6px 10px',
     borderRadius: '6px',
