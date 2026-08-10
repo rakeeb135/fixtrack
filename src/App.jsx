@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 
 const MASTER_ADMIN_EMAIL = 'rakeebroomy@gmail.com'
-const YOUR_WHATSAPP_NUMBER = '94769944414' // Converted 0769944414 for WhatsApp routing
+const YOUR_WHATSAPP_NUMBER = '94769944414'
 
 export default function App() {
   const urlParams = new URLSearchParams(window.location.search)
@@ -25,6 +25,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeMenuId, setActiveMenuId] = useState(null)
   const [editingJob, setEditingJob] = useState(null)
+  const [showPayModal, setShowPayModal] = useState(false)
 
   // Admin Dashboard State
   const [allProfiles, setAllProfiles] = useState([])
@@ -141,6 +142,16 @@ export default function App() {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
+    })
+  }
+
+  function formatDateOnly(isoString) {
+    if (!isoString) return ''
+    const d = new Date(isoString)
+    return d.toLocaleDateString('en-GB', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
     })
   }
 
@@ -354,7 +365,7 @@ export default function App() {
 
   function sendRenewalWhatsApp() {
     const rate = profile?.monthly_rate || 2000
-    const message = `Hi! I am the owner of ${session?.user?.email}. I want to renew my FixTrack subscription (LKR ${rate}/month). Here is my payment receipt screenshot:`
+    const message = `Hi! I am the owner of ${session?.user?.email}. I have made the bank transfer for my FixTrack subscription renewal (LKR ${rate}/month). Here is my payment receipt screenshot:`
     window.open(`https://wa.me/${YOUR_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
@@ -659,17 +670,19 @@ export default function App() {
         </div>
       </header>
 
-      {/* WARNING BANNER */}
+      {/* REFINED WARNING BANNER */}
       {isNearExpiry && (
-        <div style={styles.warningBanner}>
-          <div>
-            <strong>👋 Subscription Renews in {daysLeft} Day{daysLeft > 1 ? 's' : ''}!</strong>
-            <div style={{ fontSize: '12px', opacity: 0.9 }}>
-              Rate: LKR {profile?.monthly_rate || 2000}/month
-            </div>
+        <div style={styles.warningBannerCard}>
+          <div style={{ flex: 1 }}>
+            <strong style={{ fontSize: '14px', display: 'block', color: '#854d0e', marginBottom: '2px' }}>
+              ⏳ Subscription Access Ends on {formatDateOnly(profile?.expiry_date)} ({daysLeft} Day{daysLeft > 1 ? 's' : ''} Left)
+            </strong>
+            <span style={{ fontSize: '12px', color: '#a16207' }}>
+              Rate: LKR {profile?.monthly_rate || 2000}/month • Your customer tracking links remain active.
+            </span>
           </div>
-          <button onClick={sendRenewalWhatsApp} style={styles.btnBannerPay}>
-            💳 Pay & Renew
+          <button onClick={() => setShowPayModal(true)} style={styles.btnBannerPay}>
+            💳 View Renewal Details
           </button>
         </div>
       )}
@@ -848,16 +861,17 @@ export default function App() {
           </div>
 
           <div style={styles.card}>
+            {/* COLOR-CODED TAB BAR */}
             <div style={styles.tabBar}>
               <button
                 onClick={() => setActiveTab('active')}
-                style={activeTab === 'active' ? styles.tabActive : styles.tabInactive}
+                style={activeTab === 'active' ? styles.tabActiveBlue : styles.tabInactive}
               >
                 Active Repairs ({activeJobs.length})
               </button>
               <button
                 onClick={() => setActiveTab('completed')}
-                style={activeTab === 'completed' ? styles.tabActive : styles.tabInactive}
+                style={activeTab === 'completed' ? styles.tabActiveGreen : styles.tabInactive}
               >
                 Completed ({completedJobs.length})
               </button>
@@ -891,11 +905,14 @@ export default function App() {
                         </strong>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <select
                           value={job.status}
                           onChange={(e) => updateStatus(job.id, e.target.value)}
-                          style={getStatusStyle(job.status)}
+                          style={{
+                            ...getStatusStyle(job.status),
+                            paddingRight: '22px', // Safe padding to prevent dots collision
+                          }}
                         >
                           <option value="Received">Received</option>
                           <option value="In Progress">In Progress</option>
@@ -937,7 +954,8 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div style={styles.jobCardBody}>
+                    {/* RESPONSIVE CLEAN JOB CARD BODY */}
+                    <div style={styles.jobCardBodyStack}>
                       <p style={styles.jobText}>
                         <span>📱 Device:</span> <strong>{job.device_model}</strong>
                       </p>
@@ -971,6 +989,50 @@ export default function App() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* RENEWAL BANK DETAILS MODAL */}
+      {showPayModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h3 style={{ marginTop: 0, color: '#1e3a8a' }}>💳 FixTrack Renewal Details</h3>
+            <p style={{ color: '#475569', fontSize: '13px', lineHeight: '1.4' }}>
+              Thank you for partnering with us! Please transfer your subscription payment using the details below:
+            </p>
+
+            <div style={styles.bankBox}>
+              <p style={{ margin: '4px 0', fontSize: '13px' }}>
+                <strong>Current Rate:</strong> LKR {profile?.monthly_rate || 2000} / month
+              </p>
+              <p style={{ margin: '4px 0', fontSize: '13px' }}>
+                <strong>Expires On:</strong> {formatDateOnly(profile?.expiry_date)}
+              </p>
+              <hr style={{ border: 'none', borderTop: '1px solid #bfdbfe', margin: '8px 0' }} />
+              <p style={{ margin: '4px 0', fontSize: '13px' }}>
+                <strong>Bank:</strong> Commercial Bank (Kandy Branch)
+              </p>
+              <p style={{ margin: '4px 0', fontSize: '13px' }}>
+                <strong>Account Name:</strong> M.T.M Rakeeb
+              </p>
+              <p style={{ margin: '4px 0', fontSize: '13px' }}>
+                <strong>Account No:</strong> 8012055155
+              </p>
+            </div>
+
+            <p style={{ color: '#64748b', fontSize: '12px', margin: '0 0 12px 0' }}>
+              Once transferred, tap below to open WhatsApp and share your receipt screenshot.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button onClick={sendRenewalWhatsApp} style={styles.btnWhatsApp}>
+                💬 Send Receipt on WhatsApp (0769944414)
+              </button>
+              <button onClick={() => setShowPayModal(false)} style={styles.btnCancel}>
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1136,26 +1198,27 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  warningBanner: {
+  warningBannerCard: {
     backgroundColor: '#fef08a',
     color: '#854d0e',
-    padding: '12px 16px',
-    borderRadius: '10px',
+    padding: '14px 16px',
+    borderRadius: '12px',
     marginBottom: '16px',
     display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
+    gap: '10px',
     border: '1px solid #fde047',
   },
   btnBannerPay: {
     backgroundColor: '#854d0e',
     color: '#fff',
     border: 'none',
-    padding: '8px 12px',
-    borderRadius: '6px',
+    padding: '10px 14px',
+    borderRadius: '8px',
     fontWeight: 'bold',
     cursor: 'pointer',
-    fontSize: '12px',
+    fontSize: '13px',
+    width: '100%',
   },
   card: {
     backgroundColor: '#ffffff',
@@ -1219,7 +1282,7 @@ const styles = {
     cursor: 'pointer',
     fontWeight: 'bold',
     fontSize: '14px',
-    flex: 1,
+    width: '100%',
   },
   btnLogout: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -1248,7 +1311,7 @@ const styles = {
     paddingBottom: '8px',
     marginBottom: '12px',
   },
-  tabActive: {
+  tabActiveBlue: {
     backgroundColor: '#2563eb',
     color: '#ffffff',
     border: 'none',
@@ -1258,8 +1321,18 @@ const styles = {
     fontSize: '13px',
     cursor: 'pointer',
   },
+  tabActiveGreen: {
+    backgroundColor: '#10b981',
+    color: '#ffffff',
+    border: 'none',
+    padding: '8px 14px',
+    borderRadius: '8px',
+    fontWeight: 'bold',
+    fontSize: '13px',
+    cursor: 'pointer',
+  },
   tabInactive: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#f1f5f9',
     color: '#64748b',
     border: 'none',
     padding: '8px 14px',
@@ -1356,7 +1429,7 @@ const styles = {
     fontWeight: 'bold',
     color: '#64748b',
     cursor: 'pointer',
-    padding: '0 6px',
+    padding: '0 4px',
   },
   dropdownMenu: {
     position: 'absolute',
@@ -1381,10 +1454,10 @@ const styles = {
     cursor: 'pointer',
     display: 'block',
   },
-  jobCardBody: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '6px',
+  jobCardBodyStack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
     marginBottom: '8px',
   },
   jobText: {
@@ -1405,7 +1478,7 @@ const styles = {
     backgroundColor: '#22c55e',
     color: '#fff',
     border: 'none',
-    padding: '10px',
+    padding: '11px',
     borderRadius: '8px',
     fontWeight: 'bold',
     width: '100%',
