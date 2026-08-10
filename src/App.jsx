@@ -127,7 +127,7 @@ export default function App() {
     setRepairs([])
   }
 
-  // --- CLEAN CSV EXPORT FUNCTION ---
+  // --- EXCEL & GOOGLE SHEETS FRIENDLY CSV EXPORT ---
   function exportToCSV() {
     if (repairs.length === 0) {
       alert('No repair data available to export.')
@@ -148,7 +148,7 @@ export default function App() {
     const rows = repairsWithShopNum.map((job) => [
       `"#${job.shopNum}"`,
       `"${job.customer_name || ''}"`,
-      `"${formatDisplayPhone(job.phone_number)}"`,
+      `"='${formatDisplayPhone(job.phone_number)}'"`, // Forces Excel to display as literal text
       `"${job.device_model || ''}"`,
       `"${job.issue || ''}"`,
       job.cost || 0,
@@ -468,7 +468,8 @@ export default function App() {
             style={styles.input}
           />
           <input
-            type="text"
+            type="tel"
+            inputMode="tel"
             placeholder="WhatsApp Phone (e.g. 0771234567) *"
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
@@ -490,6 +491,7 @@ export default function App() {
           />
           <input
             type="number"
+            inputMode="numeric"
             placeholder="Cost (LKR)"
             value={cost}
             onChange={(e) => setCost(e.target.value)}
@@ -648,7 +650,8 @@ export default function App() {
 
               <label style={styles.label}>WhatsApp Phone</label>
               <input
-                type="text"
+                type="tel"
+                inputMode="tel"
                 value={formatDisplayPhone(editingJob.phone_number)}
                 onChange={(e) =>
                   setEditingJob({ ...editingJob, phone_number: e.target.value })
@@ -679,6 +682,7 @@ export default function App() {
               <label style={styles.label}>Cost (LKR)</label>
               <input
                 type="number"
+                inputMode="numeric"
                 value={editingJob.cost || ''}
                 onChange={(e) =>
                   setEditingJob({ ...editingJob, cost: e.target.value })
