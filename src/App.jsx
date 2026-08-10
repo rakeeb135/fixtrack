@@ -56,7 +56,7 @@ export default function App() {
     const { data, error } = await supabase
       .from('repairs')
       .select('*')
-      .order('id', { ascending: true }) // Sorted ascending so oldest is #1 for shop sequence
+      .order('id', { ascending: true })
 
     if (error) {
       console.error('Error fetching repairs:', error)
@@ -79,6 +79,26 @@ export default function App() {
       hour12: true,
     })
   }
+
+  function formatDisplayPhone(phone) {
+    if (!phone) return ''
+    if (phone.startsWith('94') && phone.length === 11) {
+      return '0' + phone.slice(2)
+    }
+    return phone
+  }
+
+  // Map each shop's repairs to a relative #1, #2, #3 numbering
+  const repairsWithShopNum = repairs.map((job, idx) => ({
+    ...job,
+    shopNum: idx + 1,
+  }))
+
+  // Reverse so newest jobs show at top of dashboard
+  const sortedRepairs = [...repairsWithShopNum].reverse()
+
+  const activeJobs = sortedRepairs.filter((j) => j.status !== 'Delivered')
+  const completedJobs = sortedRepairs.filter((j) => j.status === 'Delivered')
 
   // --- AUTHENTICATION HANDLERS ---
   async function handleLogin(e) {
@@ -107,7 +127,7 @@ export default function App() {
     setRepairs([])
   }
 
-  // --- CSV EXPORT FUNCTION ---
+  // --- CLEAN CSV EXPORT FUNCTION ---
   function exportToCSV() {
     if (repairs.length === 0) {
       alert('No repair data available to export.')
@@ -115,38 +135,34 @@ export default function App() {
     }
 
     const headers = [
-      'Shop Job #',
+      'Job Number',
       'Customer Name',
-      'Phone',
+      'Phone Number',
       'Device Model',
-      'Issue / Fault',
-      'Cost (LKR)',
+      'Issue Fault',
+      'Cost LKR',
       'Status',
       'Date Logged',
     ]
 
-    const rows = repairs.map((job, index) => [
-      `"#${index + 1}"`,
+    const rows = repairsWithShopNum.map((job) => [
+      `"#${job.shopNum}"`,
       `"${job.customer_name || ''}"`,
       `"${formatDisplayPhone(job.phone_number)}"`,
       `"${job.device_model || ''}"`,
       `"${job.issue || ''}"`,
       job.cost || 0,
-      job.status || 'Received',
+      `"${job.status || 'Received'}"`,
       `"${formatDate(job.created_at)}"`,
     ])
 
-    const csvContent =
-      'data:text/csv;charset=utf-8,\uFEFF' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n')
+    const csvString = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
 
-    const encodedUri = encodeURI(csvContent)
     const link = document.createElement('a')
-    link.setAttribute('href', encodedUri)
-    link.setAttribute(
-      'download',
-      `FixTrack_Repairs_${new Date().toISOString().slice(0, 10)}.csv`
-    )
+    link.href = url
+    link.setAttribute('download', `FixTrack_Ledger_${new Date().toISOString().slice(0, 10)}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -154,7 +170,7 @@ export default function App() {
 
   // --- CUSTOMER TRACKING VIEW (Public Access) ---
   if (trackingJobId) {
-    const trackedJob = repairs.find((j) => j.id.toString() === trackingJobId)
+    const trackedJob = repairsWithShopNum.find((j) => j.id.toString() === trackingJobId)
 
     return (
       <div style={styles.container}>
@@ -170,12 +186,12 @@ export default function App() {
             <p style={{ textAlign: 'center' }}>Loading status...</p>
           ) : !trackedJob ? (
             <p style={{ textAlign: 'center', color: '#ef4444' }}>
-              Repair Job #{trackingJobId} not found. Please check your link.
+              Repair Job not found. Please check your tracking link.
             </p>
           ) : (
             <div style={{ textAlign: 'center', padding: '10px 5px' }}>
               <span style={{ fontSize: '13px', color: '#64748b' }}>
-                Job Tracking ID
+                Shop Ticket Number
               </span>
               <h2
                 style={{
@@ -184,7 +200,7 @@ export default function App() {
                   color: '#0f172a',
                 }}
               >
-                #{trackedJob.id}
+                #{trackedJob.shopNum}
               </h2>
 
               <div
@@ -404,26 +420,6 @@ export default function App() {
       '_blank'
     )
   }
-
-  function formatDisplayPhone(phone) {
-    if (!phone) return ''
-    if (phone.startsWith('94') && phone.length === 11) {
-      return '0' + phone.slice(2)
-    }
-    return phone
-  }
-
-  // Create repairs with individual relative shop numbers (#1, #2, #3...)
-  const repairsWithShopNum = repairs.map((job, idx) => ({
-    ...job,
-    shopNum: idx + 1,
-  }))
-
-  // Reverse so newest jobs show at the top
-  const sortedRepairs = [...repairsWithShopNum].reverse()
-
-  const activeJobs = sortedRepairs.filter((j) => j.status !== 'Delivered')
-  const completedJobs = sortedRepairs.filter((j) => j.status === 'Delivered')
 
   const displayedJobs = (
     activeTab === 'active' ? activeJobs : completedJobs
