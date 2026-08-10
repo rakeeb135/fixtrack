@@ -127,7 +127,7 @@ export default function App() {
     setRepairs([])
   }
 
-  // --- EXCEL & GOOGLE SHEETS FRIENDLY CSV EXPORT ---
+// --- CLEAN CSV EXPORT (WORKS IN EXCEL & GOOGLE SHEETS) ---
   function exportToCSV() {
     if (repairs.length === 0) {
       alert('No repair data available to export.')
@@ -148,7 +148,7 @@ export default function App() {
     const rows = repairsWithShopNum.map((job) => [
       `"#${job.shopNum}"`,
       `"${job.customer_name || ''}"`,
-      `"='${formatDisplayPhone(job.phone_number)}'"`, // Forces Excel to display as literal text
+      `"\t${formatDisplayPhone(job.phone_number)}"`, // \t forces string mode without breaking formula parsers
       `"${job.device_model || ''}"`,
       `"${job.issue || ''}"`,
       job.cost || 0,
