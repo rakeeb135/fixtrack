@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 
 const MASTER_ADMIN_EMAIL = 'rakeebroomy@gmail.com'
-const YOUR_WHATSAPP_NUMBER = '94772795212'
+const YOUR_WHATSAPP_NUMBER = '94769944414' // Converted 0769944414 for WhatsApp routing
 
 export default function App() {
   const urlParams = new URLSearchParams(window.location.search)
@@ -88,7 +88,6 @@ export default function App() {
     setAuthLoading(false)
   }
 
-  // Fetch Public Tracked Job or Shop's Isolated Repairs
   useEffect(() => {
     if (trackingJobId) {
       fetchTrackedJob(trackingJobId)
@@ -478,7 +477,7 @@ export default function App() {
     )
   }
 
-  // --- EXPIRED LOCK SCREEN ---
+  // --- EXPIRED / PAUSED LOCK SCREEN ---
   if (isExpired) {
     return (
       <div style={styles.container}>
@@ -511,13 +510,13 @@ export default function App() {
               <strong>Amount Due:</strong> LKR {profile?.monthly_rate || 2000} / month
             </p>
             <p style={{ margin: '4px 0', fontSize: '13px' }}>
-              <strong>Bank:</strong> Commercial Bank / Sampath Bank
+              <strong>Bank:</strong> Commercial Bank (Kandy Branch)
             </p>
             <p style={{ margin: '4px 0', fontSize: '13px' }}>
               <strong>Account Name:</strong> M.T.M Rakeeb
             </p>
             <p style={{ margin: '4px 0', fontSize: '13px' }}>
-              <strong>Account No:</strong> [Your Bank Acc Number]
+              <strong>Account No:</strong> 8012055155
             </p>
           </div>
 
