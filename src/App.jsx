@@ -182,6 +182,14 @@ export default function App() {
   const activeJobs = sortedRepairs.filter((j) => j.status !== 'Delivered')
   const completedJobs = sortedRepairs.filter((j) => j.status === 'Delivered')
 
+  // Calculate Current Month Earnings
+  const now = new Date()
+  const currentMonthDelivered = completedJobs.filter((job) => {
+    const jobDate = new Date(job.created_at)
+    return jobDate.getMonth() === now.getMonth() && jobDate.getFullYear() === now.getFullYear()
+  })
+  const monthlyRevenue = currentMonthDelivered.reduce((sum, job) => sum + (job.cost || 0), 0)
+
   // --- AUTH HANDLERS ---
   async function handleLogin(e) {
     e.preventDefault()
@@ -365,7 +373,7 @@ export default function App() {
 
   function sendRenewalWhatsApp() {
     const rate = profile?.monthly_rate || 2000
-    const message = `Hi! I am the owner of ${session?.user?.email}. I have made the bank transfer for my FixTrack subscription renewal (LKR ${rate}/month). Here is my payment receipt screenshot:`
+    const message = `Hi! I am the owner of ${session?.user?.email}. I have made the bank transfer for my FixTrack subscription renewal (LKR ${rate}/month). Here is my payment receipt:`
     window.open(`https://wa.me/${YOUR_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
@@ -673,12 +681,12 @@ export default function App() {
       {/* REFINED WARNING BANNER */}
       {isNearExpiry && (
         <div style={styles.warningBannerCard}>
-          <div style={{ flex: 1 }}>
+          <div>
             <strong style={{ fontSize: '14px', display: 'block', color: '#854d0e', marginBottom: '2px' }}>
-              ⏳ Subscription Access Ends on {formatDateOnly(profile?.expiry_date)} ({daysLeft} Day{daysLeft > 1 ? 's' : ''} Left)
+              ⏳ Plan Expires in {daysLeft} Day{daysLeft > 1 ? 's' : ''} ({formatDateOnly(profile?.expiry_date)})
             </strong>
             <span style={{ fontSize: '12px', color: '#a16207' }}>
-              Rate: LKR {profile?.monthly_rate || 2000}/month • Your customer tracking links remain active.
+              Renewal Rate: <strong>LKR {profile?.monthly_rate || 2000} / month</strong>
             </span>
           </div>
           <button onClick={() => setShowPayModal(true)} style={styles.btnBannerPay}>
@@ -814,6 +822,22 @@ export default function App() {
       ) : (
         /* --- REGULAR SHOPKEEPER DASHBOARD --- */
         <div>
+          {/* MINI BUSINESS STATS BAR */}
+          <div style={styles.statsBarGrid}>
+            <div style={styles.statCard}>
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>IN SHOP</span>
+              <strong style={{ fontSize: '18px', color: '#2563eb' }}>{activeJobs.length} Jobs</strong>
+            </div>
+            <div style={styles.statCard}>
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>DELIVERED</span>
+              <strong style={{ fontSize: '18px', color: '#10b981' }}>{currentMonthDelivered.length} Jobs</strong>
+            </div>
+            <div style={styles.statCard}>
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>THIS MONTH</span>
+              <strong style={{ fontSize: '16px', color: '#059669' }}>LKR {monthlyRevenue.toLocaleString()}</strong>
+            </div>
+          </div>
+
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>Log New Repair Job</h2>
             <form onSubmit={handleAddRepair} style={styles.formGrid}>
@@ -911,7 +935,7 @@ export default function App() {
                           onChange={(e) => updateStatus(job.id, e.target.value)}
                           style={{
                             ...getStatusStyle(job.status),
-                            paddingRight: '22px', // Safe padding to prevent dots collision
+                            paddingRight: '22px',
                           }}
                         >
                           <option value="Received">Received</option>
@@ -954,7 +978,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* RESPONSIVE CLEAN JOB CARD BODY */}
                     <div style={styles.jobCardBodyStack}>
                       <p style={styles.jobText}>
                         <span>📱 Device:</span> <strong>{job.device_model}</strong>
@@ -1022,7 +1045,7 @@ export default function App() {
             </div>
 
             <p style={{ color: '#64748b', fontSize: '12px', margin: '0 0 12px 0' }}>
-              Once transferred, tap below to open WhatsApp and share your receipt screenshot.
+              Once transferred, tap below to open WhatsApp and share your payment receipt.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1219,6 +1242,22 @@ const styles = {
     cursor: 'pointer',
     fontSize: '13px',
     width: '100%',
+  },
+  statsBarGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1.2fr',
+    gap: '8px',
+    marginBottom: '16px',
+  },
+  statCard: {
+    backgroundColor: '#ffffff',
+    padding: '10px',
+    borderRadius: '10px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   card: {
     backgroundColor: '#ffffff',
