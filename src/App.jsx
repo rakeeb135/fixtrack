@@ -56,7 +56,7 @@ export default function App() {
     const { data, error } = await supabase
       .from('repairs')
       .select('*')
-      .order('id', { ascending: false })
+      .order('id', { ascending: true }) // Sorted ascending so oldest is #1 for shop sequence
 
     if (error) {
       console.error('Error fetching repairs:', error)
@@ -64,6 +64,20 @@ export default function App() {
       setRepairs(data || [])
     }
     setLoading(false)
+  }
+
+  // Helper to format ISO dates to clean local string
+  function formatDate(isoString) {
+    if (!isoString) return ''
+    const d = new Date(isoString)
+    return d.toLocaleString('en-GB', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    })
   }
 
   // --- AUTHENTICATION HANDLERS ---
@@ -100,23 +114,39 @@ export default function App() {
       return
     }
 
-    const headers = ['Job ID', 'Customer Name', 'Phone', 'Device Model', 'Issue', 'Cost (LKR)', 'Status', 'Created At']
-    const rows = repairs.map((job) => [
-      job.id,
+    const headers = [
+      'Shop Job #',
+      'Customer Name',
+      'Phone',
+      'Device Model',
+      'Issue / Fault',
+      'Cost (LKR)',
+      'Status',
+      'Date Logged',
+    ]
+
+    const rows = repairs.map((job, index) => [
+      `"#${index + 1}"`,
       `"${job.customer_name || ''}"`,
-      `"${job.phone_number || ''}"`,
+      `"${formatDisplayPhone(job.phone_number)}"`,
       `"${job.device_model || ''}"`,
       `"${job.issue || ''}"`,
       job.cost || 0,
       job.status || 'Received',
-      job.created_at || '',
+      `"${formatDate(job.created_at)}"`,
     ])
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n')
+    const csvContent =
+      'data:text/csv;charset=utf-8,\uFEFF' +
+      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n')
+
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement('a')
     link.setAttribute('href', encodedUri)
-    link.setAttribute('download', `FixTrack_Repairs_${new Date().toISOString().slice(0, 10)}.csv`)
+    link.setAttribute(
+      'download',
+      `FixTrack_Repairs_${new Date().toISOString().slice(0, 10)}.csv`
+    )
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -147,7 +177,13 @@ export default function App() {
               <span style={{ fontSize: '13px', color: '#64748b' }}>
                 Job Tracking ID
               </span>
-              <h2 style={{ fontSize: '32px', margin: '4px 0 16px 0', color: '#0f172a' }}>
+              <h2
+                style={{
+                  fontSize: '32px',
+                  margin: '4px 0 16px 0',
+                  color: '#0f172a',
+                }}
+              >
                 #{trackedJob.id}
               </h2>
 
@@ -179,6 +215,10 @@ export default function App() {
                   <span>Total Amount:</span>{' '}
                   <strong>LKR {trackedJob.cost || 0}</strong>
                 </p>
+                <p style={styles.trackingRow}>
+                  <span>Logged Date:</span>{' '}
+                  <strong>{formatDate(trackedJob.created_at)}</strong>
+                </p>
               </div>
             </div>
           )}
@@ -189,7 +229,9 @@ export default function App() {
 
   // --- LOGIN SCREEN FOR SHOPKEEPERS ---
   if (authLoading) {
-    return <div style={{ textAlign: 'center', padding: '50px' }}>Loading FixTrack...</div>
+    return (
+      <div style={{ textAlign: 'center', padding: '50px' }}>Loading FixTrack...</div>
+    )
   }
 
   if (!session) {
@@ -205,7 +247,13 @@ export default function App() {
         <div style={styles.card}>
           <h2 style={styles.cardTitle}>Sign In to Your Shop Account</h2>
           {authError && (
-            <div style={{ color: '#ef4444', marginBottom: '10px', fontSize: '14px' }}>
+            <div
+              style={{
+                color: '#ef4444',
+                marginBottom: '10px',
+                fontSize: '14px',
+              }}
+            >
               {authError}
             </div>
           )}
@@ -299,7 +347,7 @@ export default function App() {
   }
 
   async function deleteRepair(id) {
-    if (!window.confirm(`Are you sure you want to permanently delete Job #${id}?`))
+    if (!window.confirm(`Are you sure you want to permanently delete this job?`))
       return
     const { error } = await supabase.from('repairs').delete().eq('id', id)
     if (error) alert('Error deleting job: ' + error.message)
@@ -311,7 +359,8 @@ export default function App() {
 
   async function handleSaveEdit(e) {
     e.preventDefault()
-    const { id, customer_name, phone_number, device_model, issue, cost } = editingJob
+    const { id, customer_name, phone_number, device_model, issue, cost } =
+      editingJob
 
     let formattedPhone = phone_number.trim()
     if (formattedPhone.startsWith('0')) {
@@ -346,11 +395,14 @@ export default function App() {
     } else if (job.status === 'In Progress') {
       message = `Hi ${job.customer_name}! We are working on your ${job.device_model} (${job.issue}).\n\nTrack progress: ${trackingLink}`
     } else {
-      message = `Hi ${job.customer_name}! We received your ${job.device_model} for repair. Job ID: #${job.id}. Cost: LKR ${job.cost}.\n\nTrack status live: ${trackingLink}`
+      message = `Hi ${job.customer_name}! We received your ${job.device_model} for repair. Cost: LKR ${job.cost}.\n\nTrack status live: ${trackingLink}`
     }
 
     const encodedMessage = encodeURIComponent(message)
-    window.open(`https://wa.me/${job.phone_number}?text=${encodedMessage}`, '_blank')
+    window.open(
+      `https://wa.me/${job.phone_number}?text=${encodedMessage}`,
+      '_blank'
+    )
   }
 
   function formatDisplayPhone(phone) {
@@ -361,32 +413,45 @@ export default function App() {
     return phone
   }
 
-  const activeJobs = repairs.filter((j) => j.status !== 'Delivered')
-  const completedJobs = repairs.filter((j) => j.status === 'Delivered')
+  // Create repairs with individual relative shop numbers (#1, #2, #3...)
+  const repairsWithShopNum = repairs.map((job, idx) => ({
+    ...job,
+    shopNum: idx + 1,
+  }))
 
-  const displayedJobs = (activeTab === 'active' ? activeJobs : completedJobs).filter(
-    (job) => {
-      const query = searchQuery.toLowerCase()
-      return (
-        job.customer_name?.toLowerCase().includes(query) ||
-        job.phone_number?.includes(query) ||
-        job.device_model?.toLowerCase().includes(query) ||
-        job.status?.toLowerCase().includes(query)
-      )
-    }
-  )
+  // Reverse so newest jobs show at the top
+  const sortedRepairs = [...repairsWithShopNum].reverse()
+
+  const activeJobs = sortedRepairs.filter((j) => j.status !== 'Delivered')
+  const completedJobs = sortedRepairs.filter((j) => j.status === 'Delivered')
+
+  const displayedJobs = (
+    activeTab === 'active' ? activeJobs : completedJobs
+  ).filter((job) => {
+    const query = searchQuery.toLowerCase()
+    return (
+      job.customer_name?.toLowerCase().includes(query) ||
+      job.phone_number?.includes(query) ||
+      job.device_model?.toLowerCase().includes(query) ||
+      job.status?.toLowerCase().includes(query)
+    )
+  })
 
   return (
     <div style={styles.container} onClick={() => setActiveMenuId(null)}>
       <header style={styles.header}>
         <div>
           <h1 style={{ margin: 0, fontSize: '22px' }}>FixTrack</h1>
-          <p style={{ margin: '2px 0 0 0', opacity: 0.9, fontSize: '13px' }}>
+          <p style={{ margin: '2px 0 0 0', opacity: 0.9, fontSize: '12px' }}>
             {session.user.email}
           </p>
         </div>
-        <div style={{ textAlign: 'right', display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button onClick={exportToCSV} style={styles.btnExport} title="Export to Excel / CSV">
+        <div style={{ textAlign: 'right', display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <button
+            onClick={exportToCSV}
+            style={styles.btnExport}
+            title="Export to Excel / CSV"
+          >
             📥 Export CSV
           </button>
           <button onClick={handleLogout} style={styles.btnLogout}>
@@ -481,7 +546,7 @@ export default function App() {
               <div key={job.id} style={styles.jobCard}>
                 <div style={styles.jobCardHeader}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <span style={styles.jobId}>#{job.id}</span>
+                    <span style={styles.jobId}>#{job.shopNum}</span>
                     <strong style={{ fontSize: '16px', marginLeft: '8px' }}>
                       {job.customer_name}
                     </strong>
@@ -549,6 +614,10 @@ export default function App() {
                   </p>
                 </div>
 
+                <div style={styles.dateLabel}>
+                  📅 Logged: {formatDate(job.created_at)}
+                </div>
+
                 {job.status !== 'Delivered' && (
                   <div style={styles.jobCardActions}>
                     <button
@@ -569,7 +638,7 @@ export default function App() {
       {editingJob && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
-            <h3 style={{ marginTop: 0 }}>Edit Job #{editingJob.id}</h3>
+            <h3 style={{ marginTop: 0 }}>Edit Job #{editingJob.shopNum}</h3>
             <form onSubmit={handleSaveEdit} style={styles.formGrid}>
               <label style={styles.label}>Customer Name</label>
               <input
@@ -740,7 +809,7 @@ const styles = {
     backgroundColor: 'rgba(255,255,255,0.2)',
     color: '#ffffff',
     border: 'none',
-    padding: '6px 12px',
+    padding: '6px 10px',
     borderRadius: '6px',
     fontWeight: 'bold',
     cursor: 'pointer',
@@ -750,7 +819,7 @@ const styles = {
     backgroundColor: '#10b981',
     color: '#ffffff',
     border: 'none',
-    padding: '6px 12px',
+    padding: '6px 10px',
     borderRadius: '6px',
     fontWeight: 'bold',
     cursor: 'pointer',
@@ -845,12 +914,17 @@ const styles = {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: '6px',
-    marginBottom: '10px',
+    marginBottom: '8px',
   },
   jobText: {
     margin: 0,
     fontSize: '13px',
     color: '#334155',
+  },
+  dateLabel: {
+    fontSize: '11px',
+    color: '#64748b',
+    marginBottom: '8px',
   },
   jobCardActions: {
     borderTop: '1px solid #f1f5f9',
