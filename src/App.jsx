@@ -93,6 +93,35 @@ export default function App() {
     setRepairs([])
   }
 
+  // --- CSV EXPORT FUNCTION ---
+  function exportToCSV() {
+    if (repairs.length === 0) {
+      alert('No repair data available to export.')
+      return
+    }
+
+    const headers = ['Job ID', 'Customer Name', 'Phone', 'Device Model', 'Issue', 'Cost (LKR)', 'Status', 'Created At']
+    const rows = repairs.map((job) => [
+      job.id,
+      `"${job.customer_name || ''}"`,
+      `"${job.phone_number || ''}"`,
+      `"${job.device_model || ''}"`,
+      `"${job.issue || ''}"`,
+      job.cost || 0,
+      job.status || 'Received',
+      job.created_at || '',
+    ])
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n')
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement('a')
+    link.setAttribute('href', encodedUri)
+    link.setAttribute('download', `FixTrack_Repairs_${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   // --- CUSTOMER TRACKING VIEW (Public Access) ---
   if (trackingJobId) {
     const trackedJob = repairs.find((j) => j.id.toString() === trackingJobId)
@@ -240,6 +269,7 @@ export default function App() {
         issue: issue,
         cost: cost ? parseInt(cost) : 0,
         status: 'Received',
+        user_id: session.user.id,
       },
     ])
 
@@ -346,8 +376,6 @@ export default function App() {
     }
   )
 
-  const totalRevenue = repairs.reduce((acc, curr) => acc + (curr.cost || 0), 0)
-
   return (
     <div style={styles.container} onClick={() => setActiveMenuId(null)}>
       <header style={styles.header}>
@@ -357,7 +385,10 @@ export default function App() {
             {session.user.email}
           </p>
         </div>
-        <div style={{ textAlign: 'right' }}>
+        <div style={{ textAlign: 'right', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button onClick={exportToCSV} style={styles.btnExport} title="Export to Excel / CSV">
+            📥 Export CSV
+          </button>
           <button onClick={handleLogout} style={styles.btnLogout}>
             Sign Out
           </button>
@@ -707,6 +738,16 @@ const styles = {
   },
   btnLogout: {
     backgroundColor: 'rgba(255,255,255,0.2)',
+    color: '#ffffff',
+    border: 'none',
+    padding: '6px 12px',
+    borderRadius: '6px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    fontSize: '12px',
+  },
+  btnExport: {
+    backgroundColor: '#10b981',
     color: '#ffffff',
     border: 'none',
     padding: '6px 12px',
