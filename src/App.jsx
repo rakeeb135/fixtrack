@@ -5,25 +5,51 @@ export default function App() {
   const urlParams = new URLSearchParams(window.location.search)
   const trackingJobId = urlParams.get('track')
 
+  const [session, setSession] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
+
+  // Auth Form State
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [authError, setAuthError] = useState('')
+
+  // Dashboard State
   const [repairs, setRepairs] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('active') // 'active' or 'completed'
+  const [activeTab, setActiveTab] = useState('active')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeMenuId, setActiveMenuId] = useState(null)
-
-  // Edit Modal State
   const [editingJob, setEditingJob] = useState(null)
 
-  // Form State
+  // New Job Form State
   const [customerName, setCustomerName] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [deviceModel, setDeviceModel] = useState('')
   const [issue, setIssue] = useState('')
   const [cost, setCost] = useState('')
 
+  // Check auth session on startup
   useEffect(() => {
-    fetchRepairs()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setAuthLoading(false)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
+
+  // Fetch repairs when authenticated or when tracking a job
+  useEffect(() => {
+    if (session || trackingJobId) {
+      fetchRepairs()
+    }
+  }, [session, trackingJobId])
 
   async function fetchRepairs() {
     setLoading(true)
@@ -40,7 +66,34 @@ export default function App() {
     setLoading(false)
   }
 
-  // --- CUSTOMER TRACKING VIEW ---
+  // --- AUTHENTICATION HANDLERS ---
+  async function handleLogin(e) {
+    e.preventDefault()
+    setAuthError('')
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    if (error) setAuthError(error.message)
+  }
+
+  async function handleSignUp(e) {
+    e.preventDefault()
+    setAuthError('')
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+    })
+    if (error) setAuthError(error.message)
+    else alert('Account created! You are now logged in.')
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    setRepairs([])
+  }
+
+  // --- CUSTOMER TRACKING VIEW (Public Access) ---
   if (trackingJobId) {
     const trackedJob = repairs.find((j) => j.id.toString() === trackingJobId)
 
@@ -105,7 +158,68 @@ export default function App() {
     )
   }
 
-  // --- SHOPKEEPER DASHBOARD ---
+  // --- LOGIN SCREEN FOR SHOPKEEPERS ---
+  if (authLoading) {
+    return <div style={{ textAlign: 'center', padding: '50px' }}>Loading FixTrack...</div>
+  }
+
+  if (!session) {
+    return (
+      <div style={styles.container}>
+        <header style={styles.header}>
+          <h1 style={{ margin: 0, fontSize: '22px' }}>FixTrack</h1>
+          <p style={{ margin: '4px 0 0 0', opacity: 0.9, fontSize: '13px' }}>
+            Shopkeeper Sign In
+          </p>
+        </header>
+
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Sign In to Your Shop Account</h2>
+          {authError && (
+            <div style={{ color: '#ef4444', marginBottom: '10px', fontSize: '14px' }}>
+              {authError}
+            </div>
+          )}
+          <form onSubmit={handleLogin} style={styles.formGrid}>
+            <label style={styles.label}>Email Address</label>
+            <input
+              type="email"
+              placeholder="shop@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={styles.input}
+              required
+            />
+
+            <label style={styles.label}>Password</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={styles.input}
+              required
+            />
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+              <button type="submit" style={styles.btnPrimary}>
+                Log In
+              </button>
+              <button
+                type="button"
+                onClick={handleSignUp}
+                style={styles.btnSecondary}
+              >
+                Create Account
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  // --- DASHBOARD FUNCTIONS ---
   async function handleAddRepair(e) {
     e.preventDefault()
     if (!customerName || !phoneNumber || !deviceModel) {
@@ -217,7 +331,6 @@ export default function App() {
     return phone
   }
 
-  // Filter Active vs Completed Jobs
   const activeJobs = repairs.filter((j) => j.status !== 'Delivered')
   const completedJobs = repairs.filter((j) => j.status === 'Delivered')
 
@@ -241,16 +354,13 @@ export default function App() {
         <div>
           <h1 style={{ margin: 0, fontSize: '22px' }}>FixTrack</h1>
           <p style={{ margin: '2px 0 0 0', opacity: 0.9, fontSize: '13px' }}>
-            Repair Shop Dashboard
+            {session.user.email}
           </p>
         </div>
-        <div style={styles.statsBadge}>
-          <span>
-            Active: <strong>{activeJobs.length}</strong>
-          </span>
-          <span>
-            Total: <strong>LKR {totalRevenue}</strong>
-          </span>
+        <div style={{ textAlign: 'right' }}>
+          <button onClick={handleLogout} style={styles.btnLogout}>
+            Sign Out
+          </button>
         </div>
       </header>
 
@@ -301,7 +411,6 @@ export default function App() {
 
       {/* REPAIRS SECTION WITH TABS */}
       <div style={styles.card}>
-        {/* TABS NAVIGATION */}
         <div style={styles.tabBar}>
           <button
             onClick={() => setActiveTab('active')}
@@ -328,9 +437,7 @@ export default function App() {
         />
 
         {loading ? (
-          <p style={{ textAlign: 'center', padding: '20px' }}>
-            Loading database...
-          </p>
+          <p style={{ textAlign: 'center', padding: '20px' }}>Loading database...</p>
         ) : displayedJobs.length === 0 ? (
           <p style={{ textAlign: 'center', color: '#64748b', padding: '20px' }}>
             {activeTab === 'active'
@@ -361,7 +468,6 @@ export default function App() {
                       <option value="Delivered">Delivered</option>
                     </select>
 
-                    {/* THREE DOTS MENU */}
                     <div style={{ position: 'relative' }}>
                       <button
                         onClick={(e) => {
@@ -524,13 +630,6 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  statsBadge: {
-    display: 'flex',
-    flexDirection: 'column',
-    textAlign: 'right',
-    fontSize: '12px',
-    opacity: 0.95,
-  },
   card: {
     backgroundColor: '#ffffff',
     padding: '16px',
@@ -542,33 +641,6 @@ const styles = {
     margin: '0 0 12px 0',
     fontSize: '17px',
     color: '#0f172a',
-  },
-  tabBar: {
-    display: 'flex',
-    gap: '8px',
-    borderBottom: '2px solid #e2e8f0',
-    paddingBottom: '8px',
-    marginBottom: '12px',
-  },
-  tabActive: {
-    backgroundColor: '#2563eb',
-    color: '#ffffff',
-    border: 'none',
-    padding: '8px 14px',
-    borderRadius: '8px',
-    fontWeight: 'bold',
-    fontSize: '13px',
-    cursor: 'pointer',
-  },
-  tabInactive: {
-    backgroundColor: 'transparent',
-    color: '#64748b',
-    border: 'none',
-    padding: '8px 14px',
-    borderRadius: '8px',
-    fontWeight: '600',
-    fontSize: '13px',
-    cursor: 'pointer',
   },
   formGrid: {
     display: 'flex',
@@ -611,6 +683,17 @@ const styles = {
     fontSize: '14px',
     flex: 1,
   },
+  btnSecondary: {
+    backgroundColor: '#e2e8f0',
+    color: '#334155',
+    border: 'none',
+    padding: '11px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    flex: 1,
+  },
   btnCancel: {
     backgroundColor: '#cbd5e1',
     color: '#334155',
@@ -621,6 +704,43 @@ const styles = {
     fontWeight: 'bold',
     fontSize: '14px',
     flex: 1,
+  },
+  btnLogout: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    color: '#ffffff',
+    border: 'none',
+    padding: '6px 12px',
+    borderRadius: '6px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    fontSize: '12px',
+  },
+  tabBar: {
+    display: 'flex',
+    gap: '8px',
+    borderBottom: '2px solid #e2e8f0',
+    paddingBottom: '8px',
+    marginBottom: '12px',
+  },
+  tabActive: {
+    backgroundColor: '#2563eb',
+    color: '#ffffff',
+    border: 'none',
+    padding: '8px 14px',
+    borderRadius: '8px',
+    fontWeight: 'bold',
+    fontSize: '13px',
+    cursor: 'pointer',
+  },
+  tabInactive: {
+    backgroundColor: 'transparent',
+    color: '#64748b',
+    border: 'none',
+    padding: '8px 14px',
+    borderRadius: '8px',
+    fontWeight: '600',
+    fontSize: '13px',
+    cursor: 'pointer',
   },
   jobList: {
     display: 'flex',
