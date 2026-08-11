@@ -15,6 +15,7 @@ export default function App() {
   // Auth Form State
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false) // Toggle Password Visibility
   const [authError, setAuthError] = useState('')
 
   // Dashboard State
@@ -489,7 +490,7 @@ export default function App() {
     return <div style={{ textAlign: 'center', padding: '50px' }}>Loading FixTrack...</div>
   }
 
-  // --- LOGIN SCREEN ---
+  // --- LOGIN SCREEN WITH EYE TOGGLE ---
   if (!session) {
     return (
       <div style={styles.container}>
@@ -519,14 +520,24 @@ export default function App() {
             />
 
             <label style={styles.label}>Password</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={styles.input}
-              required
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{ ...styles.input, paddingRight: '40px' }}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={styles.btnEyeToggle}
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
 
             <button type="submit" style={{ ...styles.btnPrimary, marginTop: '10px' }}>
               Log In
@@ -1400,6 +1411,17 @@ const styles = {
     fontWeight: 'bold',
     cursor: 'pointer',
     padding: '4px',
+  },
+  btnEyeToggle: {
+    position: 'absolute',
+    right: '10px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    backgroundColor: 'transparent',
+    border: 'none',
+    fontSize: '16px',
+    cursor: 'pointer',
+    padding: '2px',
   },
   label: {
     fontSize: '12px',
