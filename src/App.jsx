@@ -45,6 +45,8 @@ export default function App() {
   const [issue, setIssue] = useState('')
   const [cost, setCost] = useState('')
 
+  const PRESET_FAULTS = ['Display', 'Battery', 'Charging', 'No Power', 'General Service']
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
@@ -163,6 +165,12 @@ export default function App() {
     return phone
   }
 
+  function formatCostDisplay(costVal) {
+    const parsed = parseInt(costVal, 10)
+    if (!parsed || parsed <= 0) return 'Pending Estimate'
+    return `LKR ${parsed.toLocaleString()}`
+  }
+
   function getDaysRemaining() {
     if (!profile?.expiry_date) return 999
     const diffTime = new Date(profile.expiry_date) - new Date()
@@ -182,7 +190,6 @@ export default function App() {
   const activeJobs = sortedRepairs.filter((j) => j.status !== 'Delivered')
   const completedJobs = sortedRepairs.filter((j) => j.status === 'Delivered')
 
-  // Calculate Current Month Earnings
   const now = new Date()
   const currentMonthDelivered = completedJobs.filter((job) => {
     const jobDate = new Date(job.created_at)
@@ -354,7 +361,7 @@ export default function App() {
       `"\t${formatDisplayPhone(job.phone_number)}"`,
       `"${job.device_model || ''}"`,
       `"${job.issue || ''}"`,
-      job.cost && job.cost > 0 ? job.cost : 'Pending Estimate',
+      job.cost || 0,
       `"${job.status || 'Received'}"`,
       `"${formatDate(job.created_at)}"`,
     ])
@@ -379,8 +386,6 @@ export default function App() {
 
   // --- PUBLIC TRACKING VIEW ---
   if (trackingJobId) {
-    const hasValidCost = trackedJob?.cost && trackedJob.cost > 0
-
     return (
       <div style={styles.container}>
         <header style={styles.header}>
@@ -432,7 +437,7 @@ export default function App() {
                 </p>
                 <p style={styles.trackingRow}>
                   <span>Total Amount:</span>{' '}
-                  <strong>{hasValidCost ? `LKR ${trackedJob.cost}` : 'Pending Estimate'}</strong>
+                  <strong>{formatCostDisplay(trackedJob.cost)}</strong>
                 </p>
                 <p style={styles.trackingRow}>
                   <span>Logged Date:</span>{' '}
@@ -633,16 +638,21 @@ export default function App() {
 
   function sendWhatsAppNotification(job) {
     const trackingLink = `${window.location.origin}?track=${job.id}`
-    const hasValidCost = job.cost && job.cost > 0
-    const costText = hasValidCost ? `Cost: LKR ${job.cost}.` : `Cost will be estimated after inspection.`
+
+    let costString = ''
+    if (job.cost && parseInt(job.cost) > 0) {
+      costString = `Cost: LKR ${job.cost}.`
+    } else {
+      costString = `Cost will be estimated after inspection.`
+    }
 
     let message = ''
     if (job.status === 'Ready') {
-      message = `Hi ${job.customer_name}! Your ${job.device_model} repair is completed and ready for pickup! ${hasValidCost ? `Total due: LKR ${job.cost}.` : ''}\n\nTrack status: ${trackingLink}`
+      message = `Hi ${job.customer_name}! Your ${job.device_model} repair is completed and ready for pickup! ${costString}\n\nTrack status: ${trackingLink}`
     } else if (job.status === 'In Progress') {
       message = `Hi ${job.customer_name}! We are working on your ${job.device_model} (${job.issue || 'Service'}).\n\nTrack progress: ${trackingLink}`
     } else {
-      message = `Hi ${job.customer_name}! We received your ${job.device_model} for repair. ${costText}\n\nTrack status live: ${trackingLink}`
+      message = `Hi ${job.customer_name}! We received your ${job.device_model} for repair. ${costString}\n\nTrack status live: ${trackingLink}`
     }
 
     window.open(`https://wa.me/${job.phone_number}?text=${encodeURIComponent(message)}`, '_blank')
@@ -867,8 +877,7 @@ export default function App() {
                 onChange={(e) => setDeviceModel(e.target.value)}
                 style={styles.input}
               />
-              
-              {/* FAULT INPUT WITH PRESET CHIPS */}
+
               <div>
                 <input
                   type="text"
@@ -877,15 +886,17 @@ export default function App() {
                   onChange={(e) => setIssue(e.target.value)}
                   style={styles.input}
                 />
-                <div style={styles.chipsContainer}>
-                  {['Display / Screen', 'Battery', 'Charging Port', 'No Power', 'Board Service'].map((chip) => (
+
+                {/* NEAT HORIZONTAL SCROLLING PRESET TAGS */}
+                <div style={styles.presetContainer}>
+                  {PRESET_FAULTS.map((tag) => (
                     <button
-                      key={chip}
+                      key={tag}
                       type="button"
-                      onClick={() => setIssue(chip)}
-                      style={styles.chipButton}
+                      onClick={() => setIssue(tag)}
+                      style={styles.presetChip}
                     >
-                      + {chip}
+                      + {tag}
                     </button>
                   ))}
                 </div>
@@ -894,7 +905,7 @@ export default function App() {
               <input
                 type="number"
                 inputMode="numeric"
-                placeholder="Cost (LKR) - Leave blank if not estimated"
+                placeholder="Cost LKR (Leave blank if pending estimate)"
                 value={cost}
                 onChange={(e) => setCost(e.target.value)}
                 style={styles.input}
@@ -940,101 +951,97 @@ export default function App() {
               </p>
             ) : (
               <div style={styles.jobList}>
-                {displayedJobs.map((job) => {
-                  const hasCost = job.cost && job.cost > 0
-                  return (
-                    <div key={job.id} style={styles.jobCard}>
-                      <div style={styles.jobCardHeader}>
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                          <span style={styles.jobId}>#{job.shopNum}</span>
-                          <strong style={{ fontSize: '16px', marginLeft: '8px' }}>
-                            {job.customer_name}
-                          </strong>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <select
-                            value={job.status}
-                            onChange={(e) => updateStatus(job.id, e.target.value)}
-                            style={{
-                              ...getStatusStyle(job.status),
-                              paddingRight: '22px',
-                            }}
-                          >
-                            <option value="Received">Received</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Ready">Ready</option>
-                            <option value="Delivered">Delivered</option>
-                          </select>
-
-                          <div style={{ position: 'relative' }}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setActiveMenuId(activeMenuId === job.id ? null : job.id)
-                              }}
-                              style={styles.btnMenuDots}
-                            >
-                              ⋮
-                            </button>
-
-                            {activeMenuId === job.id && (
-                              <div style={styles.dropdownMenu}>
-                                <button
-                                  onClick={() => {
-                                    setEditingJob(job)
-                                    setActiveMenuId(null)
-                                  }}
-                                  style={styles.dropdownItem}
-                                >
-                                  ✏️ Edit Details
-                                </button>
-                                <button
-                                  onClick={() => deleteRepair(job.id)}
-                                  style={{ ...styles.dropdownItem, color: '#ef4444' }}
-                                >
-                                  🗑️ Delete Job
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                {displayedJobs.map((job) => (
+                  <div key={job.id} style={styles.jobCard}>
+                    <div style={styles.jobCardHeader}>
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span style={styles.jobId}>#{job.shopNum}</span>
+                        <strong style={{ fontSize: '16px', marginLeft: '8px' }}>
+                          {job.customer_name}
+                        </strong>
                       </div>
 
-                      <div style={styles.jobCardBodyStack}>
-                        <p style={styles.jobText}>
-                          <span>📱 Device:</span> <strong>{job.device_model}</strong>
-                        </p>
-                        <p style={styles.jobText}>
-                          <span>🔧 Fault:</span> <strong>{job.issue || '-'}</strong>
-                        </p>
-                        <p style={styles.jobText}>
-                          <span>📞 Phone:</span>{' '}
-                          <strong>{formatDisplayPhone(job.phone_number)}</strong>
-                        </p>
-                        <p style={styles.jobText}>
-                          <span>💰 Cost:</span>{' '}
-                          <strong>{hasCost ? `LKR ${job.cost}` : 'Pending Estimate'}</strong>
-                        </p>
-                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <select
+                          value={job.status}
+                          onChange={(e) => updateStatus(job.id, e.target.value)}
+                          style={{
+                            ...getStatusStyle(job.status),
+                            paddingRight: '22px',
+                          }}
+                        >
+                          <option value="Received">Received</option>
+                          <option value="In Progress">In Progress</option>
+                          <option value="Ready">Ready</option>
+                          <option value="Delivered">Delivered</option>
+                        </select>
 
-                      <div style={styles.dateLabel}>
-                        📅 Logged: {formatDate(job.created_at)}
-                      </div>
-
-                      {job.status !== 'Delivered' && (
-                        <div style={styles.jobCardActions}>
+                        <div style={{ position: 'relative' }}>
                           <button
-                            onClick={() => sendWhatsAppNotification(job)}
-                            style={styles.btnWhatsApp}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setActiveMenuId(activeMenuId === job.id ? null : job.id)
+                            }}
+                            style={styles.btnMenuDots}
                           >
-                            💬 Send WhatsApp Status Link
+                            ⋮
                           </button>
+
+                          {activeMenuId === job.id && (
+                            <div style={styles.dropdownMenu}>
+                              <button
+                                onClick={() => {
+                                  setEditingJob(job)
+                                  setActiveMenuId(null)
+                                }}
+                                style={styles.dropdownItem}
+                              >
+                                ✏️ Edit Details
+                              </button>
+                              <button
+                                onClick={() => deleteRepair(job.id)}
+                                style={{ ...styles.dropdownItem, color: '#ef4444' }}
+                              >
+                                🗑️ Delete Job
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
-                  )
-                })}
+
+                    <div style={styles.jobCardBodyStack}>
+                      <p style={styles.jobText}>
+                        <span>📱 Device:</span> <strong>{job.device_model}</strong>
+                      </p>
+                      <p style={styles.jobText}>
+                        <span>🔧 Fault:</span> <strong>{job.issue || '-'}</strong>
+                      </p>
+                      <p style={styles.jobText}>
+                        <span>📞 Phone:</span>{' '}
+                        <strong>{formatDisplayPhone(job.phone_number)}</strong>
+                      </p>
+                      <p style={styles.jobText}>
+                        <span>💰 Cost:</span> <strong>{formatCostDisplay(job.cost)}</strong>
+                      </p>
+                    </div>
+
+                    <div style={styles.dateLabel}>
+                      📅 Logged: {formatDate(job.created_at)}
+                    </div>
+
+                    {job.status !== 'Delivered' && (
+                      <div style={styles.jobCardActions}>
+                        <button
+                          onClick={() => sendWhatsAppNotification(job)}
+                          style={styles.btnWhatsApp}
+                        >
+                          💬 Send WhatsApp Status Link
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -1136,6 +1143,7 @@ export default function App() {
               <input
                 type="number"
                 inputMode="numeric"
+                placeholder="Leave 0 or blank for Pending Estimate"
                 value={editingJob.cost || ''}
                 onChange={(e) =>
                   setEditingJob({ ...editingJob, cost: e.target.value })
@@ -1301,6 +1309,26 @@ const styles = {
     flexDirection: 'column',
     gap: '10px',
   },
+  presetContainer: {
+    display: 'flex',
+    gap: '6px',
+    overflowX: 'auto',
+    marginTop: '6px',
+    paddingBottom: '2px',
+    scrollbarWidth: 'none',
+  },
+  presetChip: {
+    backgroundColor: '#f1f5f9',
+    color: '#475569',
+    border: '1px solid #cbd5e1',
+    borderRadius: '12px',
+    padding: '4px 10px',
+    fontSize: '11px',
+    fontWeight: '600',
+    whiteSpace: 'nowrap',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
   label: {
     fontSize: '12px',
     fontWeight: 'bold',
@@ -1325,22 +1353,6 @@ const styles = {
     color: '#0f172a',
     width: '100%',
     boxSizing: 'border-box',
-  },
-  chipsContainer: {
-    display: 'flex',
-    gap: '6px',
-    flexWrap: 'wrap',
-    marginTop: '6px',
-  },
-  chipButton: {
-    backgroundColor: '#f1f5f9',
-    color: '#334155',
-    border: '1px solid #cbd5e1',
-    padding: '4px 8px',
-    borderRadius: '12px',
-    fontSize: '11px',
-    fontWeight: '600',
-    cursor: 'pointer',
   },
   btnPrimary: {
     backgroundColor: '#2563eb',
