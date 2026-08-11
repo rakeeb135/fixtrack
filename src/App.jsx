@@ -15,7 +15,7 @@ export default function App() {
   // Auth Form State
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false) // Toggle Password Visibility
+  const [showPassword, setShowPassword] = useState(false)
   const [authError, setAuthError] = useState('')
 
   // Dashboard State
@@ -490,7 +490,7 @@ export default function App() {
     return <div style={{ textAlign: 'center', padding: '50px' }}>Loading FixTrack...</div>
   }
 
-  // --- LOGIN SCREEN WITH EYE TOGGLE ---
+  // --- LOGIN SCREEN WITH VECTOR SVG EYE TOGGLE ---
   if (!session) {
     return (
       <div style={styles.container}>
@@ -535,7 +535,19 @@ export default function App() {
                 style={styles.btnEyeToggle}
                 title={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? '🙈' : '👁️'}
+                {showPassword ? (
+                  /* Clean Eye-Off SVG */
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.45 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                ) : (
+                  /* Clean Eye-On SVG */
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
               </button>
             </div>
 
@@ -1419,9 +1431,11 @@ const styles = {
     transform: 'translateY(-50%)',
     backgroundColor: 'transparent',
     border: 'none',
-    fontSize: '16px',
     cursor: 'pointer',
-    padding: '2px',
+    padding: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   label: {
     fontSize: '12px',
