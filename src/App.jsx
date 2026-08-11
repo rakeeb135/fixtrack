@@ -45,7 +45,44 @@ export default function App() {
   const [issue, setIssue] = useState('')
   const [cost, setCost] = useState('')
 
-  const PRESET_FAULTS = ['Display', 'Battery', 'Charging', 'No Power', 'General Service']
+  // Custom Preset Tags (Stored in LocalStorage)
+  const [customTags, setCustomTags] = useState([])
+  const defaultFaults = ['Display', 'Battery', 'Charging', 'No Power']
+
+  useEffect(() => {
+    const saved = localStorage.getItem('fixtrack_custom_tags')
+    if (saved) {
+      try {
+        setCustomTags(JSON.parse(saved))
+      } catch (e) {
+        console.error('Error loading custom tags', e)
+      }
+    }
+  }, [])
+
+  function handleAddCustomTag() {
+    const tag = prompt('Enter custom repair tag (e.g. HDMI Port, Speaker, Glass):')
+    if (tag && tag.trim()) {
+      const cleanTag = tag.trim()
+      if (!customTags.includes(cleanTag) && !defaultFaults.includes(cleanTag)) {
+        const updated = [...customTags, cleanTag]
+        setCustomTags(updated)
+        localStorage.setItem('fixtrack_custom_tags', JSON.stringify(updated))
+      }
+      appendFaultTag(cleanTag)
+    }
+  }
+
+  function appendFaultTag(tag) {
+    if (!issue) {
+      setIssue(tag)
+    } else {
+      const existing = issue.split(',').map((s) => s.trim())
+      if (!existing.includes(tag)) {
+        setIssue(`${issue}, ${tag}`)
+      }
+    }
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -670,6 +707,8 @@ export default function App() {
     }
   )
 
+  const allAvailableTags = [...defaultFaults, ...customTags]
+
   return (
     <div style={styles.container} onClick={() => setActiveMenuId(null)}>
       {/* HEADER */}
@@ -879,26 +918,46 @@ export default function App() {
               />
 
               <div>
-                <input
-                  type="text"
-                  placeholder="Issue / Fault (e.g. Display Replacement)"
-                  value={issue}
-                  onChange={(e) => setIssue(e.target.value)}
-                  style={styles.input}
-                />
+                {/* INPUT WITH CLEAR (✕) BUTTON */}
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder="Issue / Fault (e.g. Display Replacement)"
+                    value={issue}
+                    onChange={(e) => setIssue(e.target.value)}
+                    style={{ ...styles.input, paddingRight: '30px' }}
+                  />
+                  {issue && (
+                    <button
+                      type="button"
+                      onClick={() => setIssue('')}
+                      style={styles.btnClearInput}
+                      title="Clear field"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
 
-                {/* NEAT HORIZONTAL SCROLLING PRESET TAGS */}
+                {/* NEAT TAG CHIPS WITH MULTI-SELECT & + CUSTOM BUTTON */}
                 <div style={styles.presetContainer}>
-                  {PRESET_FAULTS.map((tag) => (
+                  {allAvailableTags.map((tag) => (
                     <button
                       key={tag}
                       type="button"
-                      onClick={() => setIssue(tag)}
+                      onClick={() => appendFaultTag(tag)}
                       style={styles.presetChip}
                     >
-                      + {tag}
+                      {tag}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={handleAddCustomTag}
+                    style={styles.presetChipAdd}
+                  >
+                    + Custom
+                  </button>
                 </div>
               </div>
 
@@ -1319,7 +1378,7 @@ const styles = {
   },
   presetChip: {
     backgroundColor: '#f1f5f9',
-    color: '#475569',
+    color: '#334155',
     border: '1px solid #cbd5e1',
     borderRadius: '12px',
     padding: '4px 10px',
@@ -1328,6 +1387,31 @@ const styles = {
     whiteSpace: 'nowrap',
     cursor: 'pointer',
     flexShrink: 0,
+  },
+  presetChipAdd: {
+    backgroundColor: '#eff6ff',
+    color: '#2563eb',
+    border: '1px dashed #3b82f6',
+    borderRadius: '12px',
+    padding: '4px 10px',
+    fontSize: '11px',
+    fontWeight: 'bold',
+    whiteSpace: 'nowrap',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+  btnClearInput: {
+    position: 'absolute',
+    right: '8px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: '#94a3b8',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    padding: '4px',
   },
   label: {
     fontSize: '12px',
