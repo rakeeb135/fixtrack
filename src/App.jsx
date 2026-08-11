@@ -30,9 +30,12 @@ export default function App() {
   // Admin Dashboard State
   const [allProfiles, setAllProfiles] = useState([])
   const [newShopEmail, setNewShopEmail] = useState('')
-  const [newShopPassword, setNewShopPassword] = useState('')
+  const [newShopPassword, setNewShopPassword] = useState('FixTrack@123')
+  const [newShopPhone, setNewShopPhone] = useState('')
   const [newShopRate, setNewShopRate] = useState('2000')
   const [newShopPlan, setNewShopPlan] = useState('trial')
+  const [lastOnboardedShop, setLastOnboardedShop] = useState(null)
+
   const [editingRateProfile, setEditingRateProfile] = useState(null)
   const [customRateInput, setCustomRateInput] = useState('')
   const [editingDateProfile, setEditingDateProfile] = useState(null)
@@ -229,11 +232,16 @@ export default function App() {
   async function handleCreateShopAccount(e) {
     e.preventDefault()
     if (!newShopEmail || !newShopPassword) {
-      alert('Please fill out all fields.')
+      alert('Please fill out email and password.')
       return
     }
 
     const currentAdminUser = session.user
+
+    let formattedShopPhone = newShopPhone.trim()
+    if (formattedShopPhone.startsWith('0')) {
+      formattedShopPhone = '94' + formattedShopPhone.slice(1)
+    }
 
     const initialExpiry = newShopPlan === 'trial'
       ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
@@ -254,6 +262,7 @@ export default function App() {
         {
           id: data.user.id,
           email: newShopEmail,
+          phone_number: formattedShopPhone,
           role: 'shop',
           status: newShopPlan === 'trial' ? 'trial' : 'active',
           monthly_rate: parseInt(newShopRate) || 2000,
@@ -266,12 +275,26 @@ export default function App() {
         refresh_token: session.refresh_token,
       })
 
+      setLastOnboardedShop({
+        email: newShopEmail,
+        password: newShopPassword,
+        phone: formattedShopPhone,
+      })
+
       alert(`Account created successfully for ${newShopEmail}!`)
       setNewShopEmail('')
-      setNewShopPassword('')
+      setNewShopPassword('FixTrack@123')
+      setNewShopPhone('')
       fetchUserProfile(currentAdminUser)
       fetchAllProfiles()
     }
+  }
+
+  function sendShopWelcomeWhatsApp() {
+    if (!lastOnboardedShop) return
+    const siteUrl = window.location.origin
+    const message = `👋 Welcome to FixTrack!\nWe're excited to help you manage your repair shop smoothly! 🚀\n\n🌐 Portal: ${siteUrl}\n📧 Email: ${lastOnboardedShop.email}\n🔑 Password: ${lastOnboardedShop.password}\n\nTap the link above to log in and start sending live repair tracking links to your customers!\n\nNeed help? Reply to this chat anytime. 😊`
+    window.open(`https://wa.me/${lastOnboardedShop.phone}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
   async function extendSubscription(targetProfile, monthsToAdd) {
@@ -729,19 +752,26 @@ export default function App() {
             <form onSubmit={handleCreateShopAccount} style={styles.formGrid}>
               <input
                 type="email"
-                placeholder="Shop Email *"
+                placeholder="Shop Login Email (e.g. kandymobiles@shop.com) *"
                 value={newShopEmail}
                 onChange={(e) => setNewShopEmail(e.target.value)}
                 style={styles.input}
                 required
               />
               <input
-                type="password"
+                type="text"
                 placeholder="Initial Password *"
                 value={newShopPassword}
                 onChange={(e) => setNewShopPassword(e.target.value)}
                 style={styles.input}
                 required
+              />
+              <input
+                type="tel"
+                placeholder="Shopkeeper WhatsApp Phone (e.g. 0771234567)"
+                value={newShopPhone}
+                onChange={(e) => setNewShopPhone(e.target.value)}
+                style={styles.input}
               />
               <div style={{ display: 'flex', gap: '10px' }}>
                 <input
@@ -764,6 +794,15 @@ export default function App() {
                 Create Shop Account
               </button>
             </form>
+
+            {/* WELCOME WHATSAPP ACTION BUTTON */}
+            {lastOnboardedShop && lastOnboardedShop.phone && (
+              <div style={{ marginTop: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                <button onClick={sendShopWelcomeWhatsApp} style={styles.btnWhatsApp}>
+                  💬 Send Welcome WhatsApp to {lastOnboardedShop.email}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* ALL CLIENT SHOPS */}
