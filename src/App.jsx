@@ -45,33 +45,7 @@ export default function App() {
   const [issue, setIssue] = useState('')
   const [cost, setCost] = useState('')
 
-  // Custom Preset Tags (Stored in LocalStorage)
-  const [customTags, setCustomTags] = useState([])
-  const defaultFaults = ['Display', 'Battery', 'Charging', 'No Power']
-
-  useEffect(() => {
-    const saved = localStorage.getItem('fixtrack_custom_tags')
-    if (saved) {
-      try {
-        setCustomTags(JSON.parse(saved))
-      } catch (e) {
-        console.error('Error loading custom tags', e)
-      }
-    }
-  }, [])
-
-  function handleAddCustomTag() {
-    const tag = prompt('Enter custom repair tag (e.g. HDMI Port, Speaker, Glass):')
-    if (tag && tag.trim()) {
-      const cleanTag = tag.trim()
-      if (!customTags.includes(cleanTag) && !defaultFaults.includes(cleanTag)) {
-        const updated = [...customTags, cleanTag]
-        setCustomTags(updated)
-        localStorage.setItem('fixtrack_custom_tags', JSON.stringify(updated))
-      }
-      appendFaultTag(cleanTag)
-    }
-  }
+  const DEFAULT_FAULTS = ['Display', 'Battery', 'Charging', 'No Power', 'Speaker']
 
   function appendFaultTag(tag) {
     if (!issue) {
@@ -707,8 +681,6 @@ export default function App() {
     }
   )
 
-  const allAvailableTags = [...defaultFaults, ...customTags]
-
   return (
     <div style={styles.container} onClick={() => setActiveMenuId(null)}>
       {/* HEADER */}
@@ -939,9 +911,9 @@ export default function App() {
                   )}
                 </div>
 
-                {/* NEAT TAG CHIPS WITH MULTI-SELECT & + CUSTOM BUTTON */}
+                {/* NEAT WRAPPING 5 DEFAULT TAG CHIPS */}
                 <div style={styles.presetContainer}>
-                  {allAvailableTags.map((tag) => (
+                  {DEFAULT_FAULTS.map((tag) => (
                     <button
                       key={tag}
                       type="button"
@@ -951,13 +923,6 @@ export default function App() {
                       {tag}
                     </button>
                   ))}
-                  <button
-                    type="button"
-                    onClick={handleAddCustomTag}
-                    style={styles.presetChipAdd}
-                  >
-                    + Custom
-                  </button>
                 </div>
               </div>
 
@@ -1370,11 +1335,9 @@ const styles = {
   },
   presetContainer: {
     display: 'flex',
+    flexWrap: 'wrap',
     gap: '6px',
-    overflowX: 'auto',
     marginTop: '6px',
-    paddingBottom: '2px',
-    scrollbarWidth: 'none',
   },
   presetChip: {
     backgroundColor: '#f1f5f9',
@@ -1384,21 +1347,7 @@ const styles = {
     padding: '4px 10px',
     fontSize: '11px',
     fontWeight: '600',
-    whiteSpace: 'nowrap',
     cursor: 'pointer',
-    flexShrink: 0,
-  },
-  presetChipAdd: {
-    backgroundColor: '#eff6ff',
-    color: '#2563eb',
-    border: '1px dashed #3b82f6',
-    borderRadius: '12px',
-    padding: '4px 10px',
-    fontSize: '11px',
-    fontWeight: 'bold',
-    whiteSpace: 'nowrap',
-    cursor: 'pointer',
-    flexShrink: 0,
   },
   btnClearInput: {
     position: 'absolute',
