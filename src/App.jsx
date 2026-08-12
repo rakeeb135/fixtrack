@@ -214,7 +214,6 @@ export default function App() {
   })
   const monthlyRevenue = currentMonthDelivered.reduce((sum, job) => sum + (job.cost || 0), 0)
 
-  // CALCULATE MONTHLY REVENUE HISTORY
   const monthlyRevenueHistory = completedJobs.reduce((acc, job) => {
     if (!job.cost || job.cost <= 0) return acc
     const d = new Date(job.created_at)
@@ -432,8 +431,11 @@ export default function App() {
     window.open(`https://wa.me/${YOUR_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
-  // --- PUBLIC TRACKING VIEW ---
+  // --- PUBLIC TRACKING VIEW WITH 3-STEP PROGRESS STEPPER ---
   if (trackingJobId) {
+    const statusOrder = { 'Received': 1, 'In Progress': 2, 'Ready': 3, 'Delivered': 3 }
+    const currentStep = trackedJob ? (statusOrder[trackedJob.status] || 1) : 1
+
     return (
       <div style={styles.container}>
         <header style={styles.header}>
@@ -459,17 +461,31 @@ export default function App() {
                 #{trackedJob.id}
               </h2>
 
-              <div
-                style={{
-                  ...getStatusStyle(trackedJob.status),
-                  display: 'inline-block',
-                  fontSize: '16px',
-                  padding: '8px 18px',
-                  borderRadius: '20px',
-                  marginBottom: '20px',
-                }}
-              >
-                {trackedJob.status}
+              {/* VISUAL 3-STEP PROGRESS STEPPER */}
+              <div style={styles.stepperContainer}>
+                <div style={styles.stepperTrack}>
+                  <div
+                    style={{
+                      ...styles.stepperProgress,
+                      width: currentStep === 1 ? '0%' : currentStep === 2 ? '50%' : '100%',
+                    }}
+                  />
+                </div>
+
+                <div style={styles.stepperStep}>
+                  <div style={currentStep >= 1 ? styles.stepCircleActive : styles.stepCircle}>1</div>
+                  <span style={currentStep >= 1 ? styles.stepTextActive : styles.stepText}>Received</span>
+                </div>
+
+                <div style={styles.stepperStep}>
+                  <div style={currentStep >= 2 ? styles.stepCircleActive : styles.stepCircle}>2</div>
+                  <span style={currentStep >= 2 ? styles.stepTextActive : styles.stepText}>In Progress</span>
+                </div>
+
+                <div style={styles.stepperStep}>
+                  <div style={currentStep >= 3 ? styles.stepCircleActive : styles.stepCircle}>3</div>
+                  <span style={currentStep >= 3 ? styles.stepTextActive : styles.stepText}>Ready</span>
+                </div>
               </div>
 
               <div style={styles.trackingBox}>
@@ -745,12 +761,12 @@ export default function App() {
 
   return (
     <div style={styles.container} onClick={() => setActiveMenuId(null)}>
-      {/* HEADER WITH EXPIRY BADGE */}
+      {/* RESTORED CLEAN HEADER */}
       <header style={styles.header}>
         <div>
           <h1 style={{ margin: 0, fontSize: '22px' }}>FixTrack</h1>
           <p style={{ margin: '2px 0 0 0', opacity: 0.9, fontSize: '12px' }}>
-            {session.user.email} {profile?.role === 'admin' ? '👑 (Master Admin)' : `• Plan: Active (Expires: ${formatDateOnly(profile?.expiry_date)})`}
+            {session.user.email} {profile?.role === 'admin' && '👑 (Master Admin)'}
           </p>
         </div>
         <div style={{ textAlign: 'right', display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -940,7 +956,7 @@ export default function App() {
               onClick={() => setShowRevenueHistoryModal(true)}
               title="Click to view revenue history for previous months"
             >
-              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>THIS MONTH 📊</span>
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>THIS MONTH</span>
               <strong style={{ fontSize: '16px', color: '#059669' }}>LKR {monthlyRevenue.toLocaleString()}</strong>
             </div>
           </div>
@@ -1010,7 +1026,7 @@ export default function App() {
 
               <input
                 type="text"
-                placeholder="Internal Notes (e.g. Pattern: 1234, scratch on body)"
+                placeholder="Internal Notes (e.g. Password: 1234)"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 style={styles.input}
@@ -1165,6 +1181,13 @@ export default function App() {
             )}
           </div>
         </div>
+      )}
+
+      {/* SUBTLE FOOTER EXPIRY TEXT */}
+      {profile?.role !== 'admin' && (
+        <footer style={styles.pageFooter}>
+          FixTrack Workspace • Subscription Expiry: {formatDateOnly(profile?.expiry_date)}
+        </footer>
       )}
 
       {/* REVENUE HISTORY MODAL */}
@@ -1790,6 +1813,78 @@ const styles = {
     margin: '8px 0',
     fontSize: '14px',
     color: '#334155',
+  },
+  pageFooter: {
+    textAlign: 'center',
+    fontSize: '11px',
+    color: '#94a3b8',
+    margin: '20px 0 10px 0',
+  },
+  stepperContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    position: 'relative',
+    margin: '20px 10px 24px 10px',
+  },
+  stepperTrack: {
+    position: 'absolute',
+    top: '12px',
+    left: '20px',
+    right: '20px',
+    height: '3px',
+    backgroundColor: '#e2e8f0',
+    zIndex: 1,
+  },
+  stepperProgress: {
+    height: '100%',
+    backgroundColor: '#2563eb',
+    transition: 'width 0.3s ease',
+  },
+  stepperStep: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    zIndex: 2,
+    position: 'relative',
+  },
+  stepCircle: {
+    width: '26px',
+    height: '26px',
+    borderRadius: '50%',
+    backgroundColor: '#ffffff',
+    border: '2px solid #cbd5e1',
+    color: '#64748b',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    marginBottom: '6px',
+  },
+  stepCircleActive: {
+    width: '26px',
+    height: '26px',
+    borderRadius: '50%',
+    backgroundColor: '#2563eb',
+    border: '2px solid #2563eb',
+    color: '#ffffff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    marginBottom: '6px',
+  },
+  stepText: {
+    fontSize: '11px',
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  stepTextActive: {
+    fontSize: '11px',
+    color: '#1e293b',
+    fontWeight: 'bold',
   },
   modalOverlay: {
     position: 'fixed',
