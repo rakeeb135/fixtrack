@@ -27,6 +27,7 @@ export default function App() {
   const [activeMenuId, setActiveMenuId] = useState(null)
   const [editingJob, setEditingJob] = useState(null)
   const [showPayModal, setShowPayModal] = useState(false)
+  const [showRevenueHistoryModal, setShowRevenueHistoryModal] = useState(false)
 
   // Admin Dashboard State
   const [allProfiles, setAllProfiles] = useState([])
@@ -47,6 +48,7 @@ export default function App() {
   const [phoneNumber, setPhoneNumber] = useState('')
   const [deviceModel, setDeviceModel] = useState('')
   const [issue, setIssue] = useState('')
+  const [notes, setNotes] = useState('')
   const [cost, setCost] = useState('')
 
   const DEFAULT_FAULTS = ['Display', 'Battery', 'Charging', 'No Power', 'Speaker']
@@ -211,6 +213,15 @@ export default function App() {
     return jobDate.getMonth() === now.getMonth() && jobDate.getFullYear() === now.getFullYear()
   })
   const monthlyRevenue = currentMonthDelivered.reduce((sum, job) => sum + (job.cost || 0), 0)
+
+  // CALCULATE MONTHLY REVENUE HISTORY
+  const monthlyRevenueHistory = completedJobs.reduce((acc, job) => {
+    if (!job.cost || job.cost <= 0) return acc
+    const d = new Date(job.created_at)
+    const monthKey = d.toLocaleString('en-GB', { month: 'long', year: 'numeric' })
+    acc[monthKey] = (acc[monthKey] || 0) + job.cost
+    return acc
+  }, {})
 
   // --- AUTH HANDLERS ---
   async function handleLogin(e) {
@@ -385,6 +396,7 @@ export default function App() {
       'Phone Number',
       'Device Model',
       'Issue Fault',
+      'Notes',
       'Cost LKR',
       'Status',
       'Date Logged',
@@ -396,6 +408,7 @@ export default function App() {
       `"\t${formatDisplayPhone(job.phone_number)}"`,
       `"${job.device_model || ''}"`,
       `"${job.issue || ''}"`,
+      `"${job.notes || ''}"`,
       job.cost || 0,
       `"${job.status || 'Received'}"`,
       `"${formatDate(job.created_at)}"`,
@@ -536,13 +549,11 @@ export default function App() {
                 title={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? (
-                  /* Clean Eye-Off SVG */
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.45 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
                     <line x1="1" y1="1" x2="23" y2="23" />
                   </svg>
                 ) : (
-                  /* Clean Eye-On SVG */
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                     <circle cx="12" cy="12" r="3" />
@@ -630,6 +641,7 @@ export default function App() {
         phone_number: formattedPhone,
         device_model: deviceModel,
         issue: issue,
+        notes: notes,
         cost: cost ? parseInt(cost) : 0,
         status: 'Received',
         user_id: session.user.id,
@@ -643,6 +655,7 @@ export default function App() {
       setPhoneNumber('')
       setDeviceModel('')
       setIssue('')
+      setNotes('')
       setCost('')
       fetchRepairs()
     }
@@ -669,7 +682,7 @@ export default function App() {
 
   async function handleSaveEdit(e) {
     e.preventDefault()
-    const { id, customer_name, phone_number, device_model, issue, cost } = editingJob
+    const { id, customer_name, phone_number, device_model, issue, notes, cost } = editingJob
 
     let formattedPhone = phone_number.trim()
     if (formattedPhone.startsWith('0')) {
@@ -683,6 +696,7 @@ export default function App() {
         phone_number: formattedPhone,
         device_model,
         issue,
+        notes,
         cost: parseInt(cost) || 0,
       })
       .eq('id', id)
@@ -722,6 +736,8 @@ export default function App() {
         job.customer_name?.toLowerCase().includes(query) ||
         job.phone_number?.includes(query) ||
         job.device_model?.toLowerCase().includes(query) ||
+        job.issue?.toLowerCase().includes(query) ||
+        job.notes?.toLowerCase().includes(query) ||
         job.status?.toLowerCase().includes(query)
       )
     }
@@ -729,12 +745,12 @@ export default function App() {
 
   return (
     <div style={styles.container} onClick={() => setActiveMenuId(null)}>
-      {/* HEADER */}
+      {/* HEADER WITH EXPIRY BADGE */}
       <header style={styles.header}>
         <div>
           <h1 style={{ margin: 0, fontSize: '22px' }}>FixTrack</h1>
           <p style={{ margin: '2px 0 0 0', opacity: 0.9, fontSize: '12px' }}>
-            {session.user.email} {profile?.role === 'admin' && '👑 (Master Admin)'}
+            {session.user.email} {profile?.role === 'admin' ? '👑 (Master Admin)' : `• Plan: Active (Expires: ${formatDateOnly(profile?.expiry_date)})`}
           </p>
         </div>
         <div style={{ textAlign: 'right', display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -919,8 +935,12 @@ export default function App() {
               <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>DELIVERED</span>
               <strong style={{ fontSize: '18px', color: '#10b981' }}>{currentMonthDelivered.length} Jobs</strong>
             </div>
-            <div style={styles.statCard}>
-              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>THIS MONTH</span>
+            <div
+              style={{ ...styles.statCard, cursor: 'pointer' }}
+              onClick={() => setShowRevenueHistoryModal(true)}
+              title="Click to view revenue history for previous months"
+            >
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>THIS MONTH 📊</span>
               <strong style={{ fontSize: '16px', color: '#059669' }}>LKR {monthlyRevenue.toLocaleString()}</strong>
             </div>
           </div>
@@ -989,6 +1009,14 @@ export default function App() {
               </div>
 
               <input
+                type="text"
+                placeholder="Internal Notes (e.g. Pattern: 1234, scratch on body)"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                style={styles.input}
+              />
+
+              <input
                 type="number"
                 inputMode="numeric"
                 placeholder="Cost LKR (Leave blank if pending estimate)"
@@ -1021,7 +1049,7 @@ export default function App() {
 
             <input
               type="text"
-              placeholder="🔍 Search customer, device, phone..."
+              placeholder="🔍 Search customer, device, phone, notes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={styles.searchInput}
@@ -1103,6 +1131,11 @@ export default function App() {
                       <p style={styles.jobText}>
                         <span>🔧 Fault:</span> <strong>{job.issue || '-'}</strong>
                       </p>
+                      {job.notes && (
+                        <p style={{ ...styles.jobText, color: '#64748b' }}>
+                          <span>📝 Notes:</span> <em>{job.notes}</em>
+                        </p>
+                      )}
                       <p style={styles.jobText}>
                         <span>📞 Phone:</span>{' '}
                         <strong>{formatDisplayPhone(job.phone_number)}</strong>
@@ -1130,6 +1163,35 @@ export default function App() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* REVENUE HISTORY MODAL */}
+      {showRevenueHistoryModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h3 style={{ marginTop: 0, color: '#0f172a' }}>📊 Monthly Revenue History</h3>
+            <p style={{ color: '#475569', fontSize: '13px', marginBottom: '14px' }}>
+              Completed repairs earnings breakdown by month:
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
+              {Object.keys(monthlyRevenueHistory).length === 0 ? (
+                <p style={{ color: '#64748b', fontSize: '13px', textAlign: 'center' }}>No completed earnings history recorded yet.</p>
+              ) : (
+                Object.entries(monthlyRevenueHistory).map(([month, rev]) => (
+                  <div key={month} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontWeight: '600', fontSize: '14px' }}>{month}</span>
+                    <strong style={{ color: '#059669', fontSize: '14px' }}>LKR {rev.toLocaleString()}</strong>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button onClick={() => setShowRevenueHistoryModal(false)} style={{ ...styles.btnCancel, marginTop: '16px' }}>
+              Close
+            </button>
           </div>
         </div>
       )}
@@ -1221,6 +1283,16 @@ export default function App() {
                 value={editingJob.issue || ''}
                 onChange={(e) =>
                   setEditingJob({ ...editingJob, issue: e.target.value })
+                }
+                style={styles.input}
+              />
+
+              <label style={styles.label}>Internal Notes</label>
+              <input
+                type="text"
+                value={editingJob.notes || ''}
+                onChange={(e) =>
+                  setEditingJob({ ...editingJob, notes: e.target.value })
                 }
                 style={styles.input}
               />
