@@ -431,9 +431,9 @@ export default function App() {
     window.open(`https://wa.me/${YOUR_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
-  // --- PUBLIC TRACKING VIEW WITH 3-STEP PROGRESS STEPPER ---
+  // --- SATISFYING & COLOR-CODED PUBLIC TRACKING VIEW ---
   if (trackingJobId) {
-    const statusOrder = { 'Received': 1, 'In Progress': 2, 'Ready': 3, 'Delivered': 3 }
+    const statusOrder = { 'Received': 1, 'In Progress': 2, 'Ready': 3, 'Delivered': 4 }
     const currentStep = trackedJob ? (statusOrder[trackedJob.status] || 1) : 1
 
     return (
@@ -457,35 +457,110 @@ export default function App() {
               <span style={{ fontSize: '13px', color: '#64748b' }}>
                 Repair Reference
               </span>
-              <h2 style={{ fontSize: '32px', margin: '4px 0 16px 0', color: '#0f172a' }}>
+              <h2 style={{ fontSize: '32px', margin: '4px 0 20px 0', color: '#0f172a' }}>
                 #{trackedJob.id}
               </h2>
 
-              {/* VISUAL 3-STEP PROGRESS STEPPER */}
-              <div style={styles.stepperContainer}>
-                <div style={styles.stepperTrack}>
+              {/* SATISFYING COLOR-CODED STEPPER TRACKER */}
+              <div style={styles.satisfyingStepperContainer}>
+                <div style={styles.satisfyingTrackBackground}>
                   <div
                     style={{
-                      ...styles.stepperProgress,
-                      width: currentStep === 1 ? '0%' : currentStep === 2 ? '50%' : '100%',
+                      ...styles.satisfyingTrackFill,
+                      width:
+                        currentStep === 1
+                          ? '0%'
+                          : currentStep === 2
+                          ? '50%'
+                          : '100%',
+                      background:
+                        currentStep === 1
+                          ? '#eab308'
+                          : currentStep === 2
+                          ? 'linear-gradient(90deg, #eab308 0%, #0284c7 100%)'
+                          : 'linear-gradient(90deg, #0284c7 0%, #16a34a 100%)',
                     }}
                   />
                 </div>
 
-                <div style={styles.stepperStep}>
-                  <div style={currentStep >= 1 ? styles.stepCircleActive : styles.stepCircle}>1</div>
-                  <span style={currentStep >= 1 ? styles.stepTextActive : styles.stepText}>Received</span>
+                {/* STEP 1: RECEIVED */}
+                <div style={styles.satisfyingStepNode}>
+                  <div
+                    style={
+                      currentStep >= 1
+                        ? {
+                            ...styles.satisfyingCircle,
+                            backgroundColor: '#fef3c7',
+                            borderColor: '#eab308',
+                            boxShadow: '0 0 12px rgba(234, 179, 8, 0.4)',
+                          }
+                        : styles.satisfyingCircleInactive
+                    }
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={currentStep >= 1 ? '#b45309' : '#94a3b8'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                      <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                      <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                  </div>
+                  <span style={currentStep >= 1 ? styles.stepLabelYellow : styles.stepLabelInactive}>
+                    Received
+                  </span>
                 </div>
 
-                <div style={styles.stepperStep}>
-                  <div style={currentStep >= 2 ? styles.stepCircleActive : styles.stepCircle}>2</div>
-                  <span style={currentStep >= 2 ? styles.stepTextActive : styles.stepText}>In Progress</span>
+                {/* STEP 2: IN PROGRESS */}
+                <div style={styles.satisfyingStepNode}>
+                  <div
+                    style={
+                      currentStep >= 2
+                        ? {
+                            ...styles.satisfyingCircle,
+                            backgroundColor: '#e0f2fe',
+                            borderColor: '#0284c7',
+                            boxShadow: '0 0 12px rgba(2, 132, 199, 0.4)',
+                          }
+                        : styles.satisfyingCircleInactive
+                    }
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={currentStep >= 2 ? '#0369a1' : '#94a3b8'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.4a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                    </svg>
+                  </div>
+                  <span style={currentStep >= 2 ? styles.stepLabelBlue : styles.stepLabelInactive}>
+                    In Progress
+                  </span>
                 </div>
 
-                <div style={styles.stepperStep}>
-                  <div style={currentStep >= 3 ? styles.stepCircleActive : styles.stepCircle}>3</div>
-                  <span style={currentStep >= 3 ? styles.stepTextActive : styles.stepText}>Ready</span>
+                {/* STEP 3: READY */}
+                <div style={styles.satisfyingStepNode}>
+                  <div
+                    style={
+                      currentStep >= 3
+                        ? {
+                            ...styles.satisfyingCircle,
+                            backgroundColor: '#dcfce7',
+                            borderColor: '#16a34a',
+                            boxShadow: '0 0 12px rgba(22, 163, 74, 0.4)',
+                          }
+                        : styles.satisfyingCircleInactive
+                    }
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={currentStep >= 3 ? '#15803d' : '#94a3b8'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </div>
+                  <span style={currentStep >= 3 ? styles.stepLabelGreen : styles.stepLabelInactive}>
+                    Ready
+                  </span>
                 </div>
+              </div>
+
+              {/* DYNAMIC STATUS EXPLANATION BANNER */}
+              <div style={getStatusBannerStyle(trackedJob.status)}>
+                {trackedJob.status === 'Received' && '📥 Device received and logged at the workshop.'}
+                {trackedJob.status === 'In Progress' && '🔧 Technician is actively working on your device.'}
+                {trackedJob.status === 'Ready' && '🎉 Repair completed! Your device is ready for pickup.'}
+                {trackedJob.status === 'Delivered' && '✅ Device collected and repair job closed.'}
               </div>
 
               <div style={styles.trackingBox}>
@@ -1415,6 +1490,34 @@ export default function App() {
   )
 }
 
+function getStatusBannerStyle(status) {
+  let bg = '#fef3c7'
+  let color = '#92400e'
+  let border = '#fde68a'
+
+  if (status === 'In Progress') {
+    bg = '#e0f2fe'
+    color = '#075985'
+    border = '#bae6fd'
+  } else if (status === 'Ready' || status === 'Delivered') {
+    bg = '#dcfce7'
+    color = '#166534'
+    border = '#bbf7d0'
+  }
+
+  return {
+    backgroundColor: bg,
+    color: color,
+    border: `1px solid ${border}`,
+    borderRadius: '8px',
+    padding: '10px 12px',
+    fontSize: '13px',
+    fontWeight: '600',
+    marginBottom: '18px',
+    lineHeight: '1.4',
+  }
+}
+
 const styles = {
   container: {
     fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -1820,71 +1923,77 @@ const styles = {
     color: '#94a3b8',
     margin: '20px 0 10px 0',
   },
-  stepperContainer: {
+  satisfyingStepperContainer: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     position: 'relative',
-    margin: '20px 10px 24px 10px',
+    margin: '24px 12px 20px 12px',
   },
-  stepperTrack: {
+  satisfyingTrackBackground: {
     position: 'absolute',
-    top: '12px',
-    left: '20px',
-    right: '20px',
-    height: '3px',
+    top: '18px',
+    left: '30px',
+    right: '30px',
+    height: '4px',
     backgroundColor: '#e2e8f0',
+    borderRadius: '2px',
     zIndex: 1,
   },
-  stepperProgress: {
+  satisfyingTrackFill: {
     height: '100%',
-    backgroundColor: '#2563eb',
-    transition: 'width 0.3s ease',
+    borderRadius: '2px',
+    transition: 'all 0.4s ease',
   },
-  stepperStep: {
+  satisfyingStepNode: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     zIndex: 2,
     position: 'relative',
   },
-  stepCircle: {
-    width: '26px',
-    height: '26px',
+  satisfyingCircle: {
+    width: '36px',
+    height: '36px',
+    borderRadius: '50%',
+    borderWidth: '2px',
+    borderStyle: 'solid',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: '8px',
+    transition: 'all 0.3s ease',
+  },
+  satisfyingCircleInactive: {
+    width: '36px',
+    height: '36px',
     borderRadius: '50%',
     backgroundColor: '#ffffff',
     border: '2px solid #cbd5e1',
-    color: '#64748b',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: '8px',
+  },
+  stepLabelYellow: {
     fontSize: '12px',
     fontWeight: 'bold',
-    marginBottom: '6px',
+    color: '#b45309',
   },
-  stepCircleActive: {
-    width: '26px',
-    height: '26px',
-    borderRadius: '50%',
-    backgroundColor: '#2563eb',
-    border: '2px solid #2563eb',
-    color: '#ffffff',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+  stepLabelBlue: {
     fontSize: '12px',
     fontWeight: 'bold',
-    marginBottom: '6px',
+    color: '#0369a1',
   },
-  stepText: {
-    fontSize: '11px',
-    color: '#94a3b8',
+  stepLabelGreen: {
+    fontSize: '12px',
+    fontWeight: 'bold',
+    color: '#15803d',
+  },
+  stepLabelInactive: {
+    fontSize: '12px',
     fontWeight: '600',
-  },
-  stepTextActive: {
-    fontSize: '11px',
-    color: '#1e293b',
-    fontWeight: 'bold',
+    color: '#94a3b8',
   },
   modalOverlay: {
     position: 'fixed',
