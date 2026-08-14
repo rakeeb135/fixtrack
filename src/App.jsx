@@ -74,16 +74,20 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      if (session) fetchUserProfile(session.user)
-      else setAuthLoading(false)
+      if (session) {
+        fetchUserProfile(session.user)
+      } else {
+        setAuthLoading(false)
+      }
     })
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session)
-      if (session) fetchUserProfile(session.user)
-      else {
+      if (session) {
+        await fetchUserProfile(session.user)
+      } else {
         setProfile(null)
         setAuthLoading(false)
       }
@@ -93,33 +97,38 @@ export default function App() {
   }, [])
 
   async function fetchUserProfile(user) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle()
 
-    if (data) {
-      setProfile(data)
-      setShopNameInput(data.shop_name || 'FixTrack')
-      setGoogleReviewInput(data.google_review_url || '')
-    } else {
-      const isAdmin = user.email === MASTER_ADMIN_EMAIL
-      const fallbackProfile = {
-        id: user.id,
-        email: user.email,
-        role: isAdmin ? 'admin' : 'shop',
-        status: 'active',
-        shop_name: 'FixTrack',
-        google_review_url: '',
-        monthly_rate: 2000,
-        expiry_date: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+      if (data) {
+        setProfile(data)
+        setShopNameInput(data.shop_name || 'FixTrack')
+        setGoogleReviewInput(data.google_review_url || '')
+      } else {
+        const isAdmin = user.email === MASTER_ADMIN_EMAIL
+        const fallbackProfile = {
+          id: user.id,
+          email: user.email,
+          role: isAdmin ? 'admin' : 'shop',
+          status: 'active',
+          shop_name: 'FixTrack',
+          google_review_url: '',
+          monthly_rate: 2000,
+          expiry_date: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+        }
+        setProfile(fallbackProfile)
+        setShopNameInput('FixTrack')
+        setGoogleReviewInput('')
       }
-      setProfile(fallbackProfile)
-      setShopNameInput('FixTrack')
-      setGoogleReviewInput('')
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setAuthLoading(false)
     }
-    setAuthLoading(false)
   }
 
   useEffect(() => {
@@ -240,11 +249,17 @@ export default function App() {
   async function handleLogin(e) {
     e.preventDefault()
     setAuthError('')
-    const { error } = await supabase.auth.signInWithPassword({
+    setAuthLoading(true)
+    const { error, data } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
-    if (error) setAuthError(error.message)
+    if (error) {
+      setAuthError(error.message)
+      setAuthLoading(false)
+    } else if (data?.user) {
+      await fetchUserProfile(data.user)
+    }
   }
 
   async function handleLogout() {
@@ -278,7 +293,7 @@ export default function App() {
         google_review_url: cleanReviewUrl,
       }))
       setShowSettingsModal(false)
-      alert('Shop branding settings updated successfully!')
+      alert('Settings saved successfully!')
     }
   }
 
@@ -476,7 +491,7 @@ export default function App() {
     window.open(`https://wa.me/${YOUR_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
-  // --- PUBLIC TRACKING VIEW WITH DYNAMIC SHOP BRANDING & GOOGLE REVIEWS ---
+  // --- PUBLIC TRACKING VIEW ---
   if (trackingJobId) {
     const statusOrder = { 'Received': 1, 'In Progress': 2, 'Ready': 3, 'Delivered': 4 }
     const currentStep = trackedJob ? (statusOrder[trackedJob.status] || 1) : 1
@@ -607,7 +622,6 @@ export default function App() {
                 {trackedJob.status === 'Delivered' && '✅ Device collected and repair job closed.'}
               </div>
 
-              {/* GOOGLE REVIEW CTA (ONLY SHOWN IF READY/DELIVERED & LINK EXISTS) */}
               {(currentStep >= 3) && trackedJob.google_review_url && (
                 <div style={{ marginBottom: '16px' }}>
                   <a
@@ -649,7 +663,7 @@ export default function App() {
   }
 
   if (authLoading) {
-    return <div style={{ textAlign: 'center', padding: '50px' }}>Loading FixTrack...</div>
+    return <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b', fontSize: '15px' }}>Loading FixTrack...</div>
   }
 
   // --- LOGIN SCREEN ---
@@ -720,7 +734,7 @@ export default function App() {
     )
   }
 
-  // --- EXPIRED / PAUSED LOCK SCREEN ---
+  // --- EXPIRED LOCK SCREEN ---
   if (isExpired) {
     return (
       <div style={styles.container}>
@@ -892,33 +906,25 @@ export default function App() {
     }
   )
 
+  const currentShopBrandTitle = profile?.shop_name && profile?.shop_name !== 'FixTrack' 
+    ? profile.shop_name 
+    : 'FixTrack'
+
   return (
     <div style={styles.container} onClick={() => setActiveMenuId(null)}>
-      {/* RESTORED CLEAN HEADER WITH SHOP SETTINGS BUTTON */}
+      {/* UNCLUTTERED CRISP HEADER */}
       <header style={styles.header}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '22px' }}>
-            {profile?.role !== 'admin' && profile?.shop_name !== 'FixTrack' ? profile.shop_name : 'FixTrack'}
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <h1 style={{ margin: 0, fontSize: '20px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+            {profile?.role === 'admin' ? 'FixTrack' : currentShopBrandTitle}
           </h1>
-          <p style={{ margin: '2px 0 0 0', opacity: 0.9, fontSize: '12px' }}>
+          <p style={{ margin: '2px 0 0 0', opacity: 0.85, fontSize: '12px' }}>
             {session.user.email} {profile?.role === 'admin' && '👑 (Master Admin)'}
           </p>
         </div>
-        <div style={{ textAlign: 'right', display: 'flex', gap: '6px', alignItems: 'center' }}>
-          {profile?.role !== 'admin' && (
-            <>
-              <button onClick={() => setShowSettingsModal(true)} style={styles.btnHeaderSettings} title="Shop Branding & Google Reviews">
-                ⚙️ Settings
-              </button>
-              <button onClick={exportToCSV} style={styles.btnExport} title="Export to Excel / CSV">
-                📥 Export
-              </button>
-            </>
-          )}
-          <button onClick={handleLogout} style={styles.btnLogout}>
-            Sign Out
-          </button>
-        </div>
+        <button onClick={handleLogout} style={styles.btnLogout}>
+          Sign Out
+        </button>
       </header>
 
       {/* REFINED WARNING BANNER */}
@@ -997,7 +1003,6 @@ export default function App() {
               </button>
             </form>
 
-            {/* WELCOME WHATSAPP ACTION BUTTON */}
             {lastOnboardedShop && lastOnboardedShop.phone && (
               <div style={{ marginTop: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
                 <button onClick={sendShopWelcomeWhatsApp} style={styles.btnWhatsApp}>
@@ -1107,6 +1112,16 @@ export default function App() {
               <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>THIS MONTH</span>
               <strong style={{ fontSize: '16px', color: '#059669' }}>LKR {monthlyRevenue.toLocaleString()}</strong>
             </div>
+          </div>
+
+          {/* DEDICATED CLEAN ACTION TOOLBAR */}
+          <div style={styles.toolbarGrid}>
+            <button onClick={() => setShowSettingsModal(true)} style={styles.btnToolSecondary}>
+              ⚙️ Shop Name & Reviews
+            </button>
+            <button onClick={exportToCSV} style={styles.btnToolPrimary}>
+              📥 Export Excel (CSV)
+            </button>
           </div>
 
           <div style={styles.card}>
@@ -1651,20 +1666,39 @@ const styles = {
     color: '#ffffff',
     padding: '16px 20px',
     borderRadius: '12px',
-    marginBottom: '16px',
+    marginBottom: '14px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: '12px',
   },
-  btnHeaderSettings: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  toolbarGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '8px',
+    marginBottom: '14px',
+  },
+  btnToolSecondary: {
+    backgroundColor: '#ffffff',
+    color: '#334155',
+    border: '1px solid #cbd5e1',
+    padding: '10px',
+    borderRadius: '8px',
+    fontWeight: 'bold',
+    fontSize: '12px',
+    cursor: 'pointer',
+    textAlign: 'center',
+  },
+  btnToolPrimary: {
+    backgroundColor: '#10b981',
     color: '#ffffff',
     border: 'none',
-    padding: '6px 10px',
-    borderRadius: '6px',
+    padding: '10px',
+    borderRadius: '8px',
     fontWeight: 'bold',
-    cursor: 'pointer',
     fontSize: '12px',
+    cursor: 'pointer',
+    textAlign: 'center',
   },
   warningBannerCard: {
     backgroundColor: '#fef08a',
@@ -1692,7 +1726,7 @@ const styles = {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr 1.2fr',
     gap: '8px',
-    marginBottom: '16px',
+    marginBottom: '10px',
   },
   statCard: {
     backgroundColor: '#ffffff',
@@ -1814,21 +1848,12 @@ const styles = {
     backgroundColor: 'rgba(255,255,255,0.2)',
     color: '#ffffff',
     border: 'none',
-    padding: '6px 10px',
+    padding: '6px 12px',
     borderRadius: '6px',
     fontWeight: 'bold',
     cursor: 'pointer',
     fontSize: '12px',
-  },
-  btnExport: {
-    backgroundColor: '#10b981',
-    color: '#ffffff',
-    border: 'none',
-    padding: '6px 10px',
-    borderRadius: '6px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    fontSize: '12px',
+    flexShrink: 0,
   },
   tabBar: {
     display: 'flex',
