@@ -28,6 +28,12 @@ export default function App() {
   const [editingJob, setEditingJob] = useState(null)
   const [showPayModal, setShowPayModal] = useState(false)
   const [showRevenueHistoryModal, setShowRevenueHistoryModal] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+
+  // Shop Settings State
+  const [shopNameInput, setShopNameInput] = useState('')
+  const [googleReviewInput, setGoogleReviewInput] = useState('')
+  const [settingsSaving, setSettingsSaving] = useState(false)
 
   // Admin Dashboard State
   const [allProfiles, setAllProfiles] = useState([])
@@ -36,6 +42,7 @@ export default function App() {
   const [newShopPhone, setNewShopPhone] = useState('')
   const [newShopRate, setNewShopRate] = useState('2000')
   const [newShopPlan, setNewShopPlan] = useState('trial')
+  const [newShopName, setNewShopName] = useState('')
   const [lastOnboardedShop, setLastOnboardedShop] = useState(null)
 
   const [editingRateProfile, setEditingRateProfile] = useState(null)
@@ -94,16 +101,23 @@ export default function App() {
 
     if (data) {
       setProfile(data)
+      setShopNameInput(data.shop_name || 'FixTrack')
+      setGoogleReviewInput(data.google_review_url || '')
     } else {
       const isAdmin = user.email === MASTER_ADMIN_EMAIL
-      setProfile({
+      const fallbackProfile = {
         id: user.id,
         email: user.email,
         role: isAdmin ? 'admin' : 'shop',
         status: 'active',
+        shop_name: 'FixTrack',
+        google_review_url: '',
         monthly_rate: 2000,
         expiry_date: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
-      })
+      }
+      setProfile(fallbackProfile)
+      setShopNameInput('FixTrack')
+      setGoogleReviewInput('')
     }
     setAuthLoading(false)
   }
@@ -239,6 +253,35 @@ export default function App() {
     setProfile(null)
   }
 
+  // --- SHOP SETTINGS HANDLER ---
+  async function handleSaveShopSettings(e) {
+    e.preventDefault()
+    setSettingsSaving(true)
+    const cleanShopName = shopNameInput.trim() || 'FixTrack'
+    const cleanReviewUrl = googleReviewInput.trim()
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        shop_name: cleanShopName,
+        google_review_url: cleanReviewUrl,
+      })
+      .eq('id', session.user.id)
+
+    setSettingsSaving(false)
+    if (error) {
+      alert('Error updating settings: ' + error.message)
+    } else {
+      setProfile((prev) => ({
+        ...prev,
+        shop_name: cleanShopName,
+        google_review_url: cleanReviewUrl,
+      }))
+      setShowSettingsModal(false)
+      alert('Shop branding settings updated successfully!')
+    }
+  }
+
   // --- ADMIN ACTIONS ---
   async function handleCreateShopAccount(e) {
     e.preventDefault()
@@ -274,6 +317,7 @@ export default function App() {
           id: data.user.id,
           email: newShopEmail,
           phone_number: formattedShopPhone,
+          shop_name: newShopName.trim() || 'FixTrack',
           role: 'shop',
           status: newShopPlan === 'trial' ? 'trial' : 'active',
           monthly_rate: parseInt(newShopRate) || 2000,
@@ -296,6 +340,7 @@ export default function App() {
       setNewShopEmail('')
       setNewShopPassword('FixTrack@123')
       setNewShopPhone('')
+      setNewShopName('')
       fetchUserProfile(currentAdminUser)
       fetchAllProfiles()
     }
@@ -431,18 +476,21 @@ export default function App() {
     window.open(`https://wa.me/${YOUR_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
-  // --- SATISFYING & COLOR-CODED PUBLIC TRACKING VIEW ---
+  // --- PUBLIC TRACKING VIEW WITH DYNAMIC SHOP BRANDING & GOOGLE REVIEWS ---
   if (trackingJobId) {
     const statusOrder = { 'Received': 1, 'In Progress': 2, 'Ready': 3, 'Delivered': 4 }
     const currentStep = trackedJob ? (statusOrder[trackedJob.status] || 1) : 1
+    const displayShopTitle = trackedJob?.shop_name || 'FixTrack'
 
     return (
       <div style={styles.container}>
         <header style={styles.header}>
-          <h1 style={{ margin: 0, fontSize: '22px' }}>FixTrack</h1>
-          <p style={{ margin: '4px 0 0 0', opacity: 0.9, fontSize: '13px' }}>
-            Live Repair Status
-          </p>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '20px' }}>{displayShopTitle}</h1>
+            <p style={{ margin: '2px 0 0 0', opacity: 0.85, fontSize: '12px' }}>
+              Live Repair Status • Powered by FixTrack
+            </p>
+          </div>
         </header>
 
         <div style={styles.card}>
@@ -461,7 +509,7 @@ export default function App() {
                 #{trackedJob.id}
               </h2>
 
-              {/* SATISFYING COLOR-CODED STEPPER TRACKER */}
+              {/* SATISFYING STEPPER */}
               <div style={styles.satisfyingStepperContainer}>
                 <div style={styles.satisfyingTrackBackground}>
                   <div
@@ -483,7 +531,6 @@ export default function App() {
                   />
                 </div>
 
-                {/* STEP 1: RECEIVED */}
                 <div style={styles.satisfyingStepNode}>
                   <div
                     style={
@@ -508,7 +555,6 @@ export default function App() {
                   </span>
                 </div>
 
-                {/* STEP 2: IN PROGRESS */}
                 <div style={styles.satisfyingStepNode}>
                   <div
                     style={
@@ -531,7 +577,6 @@ export default function App() {
                   </span>
                 </div>
 
-                {/* STEP 3: READY */}
                 <div style={styles.satisfyingStepNode}>
                   <div
                     style={
@@ -555,13 +600,26 @@ export default function App() {
                 </div>
               </div>
 
-              {/* DYNAMIC STATUS EXPLANATION BANNER */}
               <div style={getStatusBannerStyle(trackedJob.status)}>
                 {trackedJob.status === 'Received' && '📥 Device received and logged at the workshop.'}
                 {trackedJob.status === 'In Progress' && '🔧 Technician is actively working on your device.'}
                 {trackedJob.status === 'Ready' && '🎉 Repair completed! Your device is ready for pickup.'}
                 {trackedJob.status === 'Delivered' && '✅ Device collected and repair job closed.'}
               </div>
+
+              {/* GOOGLE REVIEW CTA (ONLY SHOWN IF READY/DELIVERED & LINK EXISTS) */}
+              {(currentStep >= 3) && trackedJob.google_review_url && (
+                <div style={{ marginBottom: '16px' }}>
+                  <a
+                    href={trackedJob.google_review_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={styles.btnGoogleReview}
+                  >
+                    ⭐ Satisfied with our repair? Leave us a Google Review!
+                  </a>
+                </div>
+              )}
 
               <div style={styles.trackingBox}>
                 <p style={styles.trackingRow}>
@@ -594,7 +652,7 @@ export default function App() {
     return <div style={{ textAlign: 'center', padding: '50px' }}>Loading FixTrack...</div>
   }
 
-  // --- LOGIN SCREEN WITH VECTOR SVG EYE TOGGLE ---
+  // --- LOGIN SCREEN ---
   if (!session) {
     return (
       <div style={styles.container}>
@@ -836,19 +894,26 @@ export default function App() {
 
   return (
     <div style={styles.container} onClick={() => setActiveMenuId(null)}>
-      {/* RESTORED CLEAN HEADER */}
+      {/* RESTORED CLEAN HEADER WITH SHOP SETTINGS BUTTON */}
       <header style={styles.header}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '22px' }}>FixTrack</h1>
+          <h1 style={{ margin: 0, fontSize: '22px' }}>
+            {profile?.role !== 'admin' && profile?.shop_name !== 'FixTrack' ? profile.shop_name : 'FixTrack'}
+          </h1>
           <p style={{ margin: '2px 0 0 0', opacity: 0.9, fontSize: '12px' }}>
             {session.user.email} {profile?.role === 'admin' && '👑 (Master Admin)'}
           </p>
         </div>
         <div style={{ textAlign: 'right', display: 'flex', gap: '6px', alignItems: 'center' }}>
           {profile?.role !== 'admin' && (
-            <button onClick={exportToCSV} style={styles.btnExport} title="Export to Excel / CSV">
-              📥 Export
-            </button>
+            <>
+              <button onClick={() => setShowSettingsModal(true)} style={styles.btnHeaderSettings} title="Shop Branding & Google Reviews">
+                ⚙️ Settings
+              </button>
+              <button onClick={exportToCSV} style={styles.btnExport} title="Export to Excel / CSV">
+                📥 Export
+              </button>
+            </>
           )}
           <button onClick={handleLogout} style={styles.btnLogout}>
             Sign Out
@@ -880,6 +945,13 @@ export default function App() {
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>➕ Onboard New Shopkeeper</h2>
             <form onSubmit={handleCreateShopAccount} style={styles.formGrid}>
+              <input
+                type="text"
+                placeholder="Shop Brand Name (e.g. Kandy Mobile Care)"
+                value={newShopName}
+                onChange={(e) => setNewShopName(e.target.value)}
+                style={styles.input}
+              />
               <input
                 type="email"
                 placeholder="Shop Login Email (e.g. kandymobiles@shop.com) *"
@@ -947,7 +1019,8 @@ export default function App() {
                   <div key={p.id} style={styles.adminShopCard}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
-                        <strong style={{ fontSize: '15px' }}>{p.email}</strong>
+                        <strong style={{ fontSize: '15px' }}>{p.shop_name || 'FixTrack'}</strong>
+                        <div style={{ fontSize: '12px', color: '#475569' }}>{p.email}</div>
                         <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
                           Rate: <strong>LKR {p.monthly_rate || 2000}</strong> / mo
                         </div>
@@ -1063,7 +1136,6 @@ export default function App() {
               />
 
               <div>
-                {/* INPUT WITH CLEAR (✕) BUTTON */}
                 <div style={{ position: 'relative' }}>
                   <input
                     type="text"
@@ -1084,7 +1156,6 @@ export default function App() {
                   )}
                 </div>
 
-                {/* NEAT WRAPPING 5 DEFAULT TAG CHIPS */}
                 <div style={styles.presetContainer}>
                   {DEFAULT_FAULTS.map((tag) => (
                     <button
@@ -1122,7 +1193,6 @@ export default function App() {
           </div>
 
           <div style={styles.card}>
-            {/* COLOR-CODED TAB BAR */}
             <div style={styles.tabBar}>
               <button
                 onClick={() => setActiveTab('active')}
@@ -1258,11 +1328,59 @@ export default function App() {
         </div>
       )}
 
-      {/* SUBTLE FOOTER EXPIRY TEXT */}
+      {/* FOOTER EXPIRY */}
       {profile?.role !== 'admin' && (
         <footer style={styles.pageFooter}>
           FixTrack Workspace • Subscription Expiry: {formatDateOnly(profile?.expiry_date)}
         </footer>
+      )}
+
+      {/* SHOP SETTINGS MODAL */}
+      {showSettingsModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h3 style={{ marginTop: 0, color: '#0f172a' }}>⚙️ Shop Branding & Google Reviews</h3>
+            <p style={{ color: '#475569', fontSize: '13px', lineHeight: '1.4', marginBottom: '14px' }}>
+              Customize how your shop appears to customers on their live tracking links:
+            </p>
+            <form onSubmit={handleSaveShopSettings} style={styles.formGrid}>
+              <label style={styles.label}>Shop Name (Shown on tracking header)</label>
+              <input
+                type="text"
+                placeholder="e.g. Kandy Mobile Care"
+                value={shopNameInput}
+                onChange={(e) => setShopNameInput(e.target.value)}
+                style={styles.input}
+                required
+              />
+
+              <label style={styles.label}>Google Maps Review Link (Optional)</label>
+              <input
+                type="url"
+                placeholder="https://g.page/r/your-shop/review"
+                value={googleReviewInput}
+                onChange={(e) => setGoogleReviewInput(e.target.value)}
+                style={styles.input}
+              />
+              <span style={{ fontSize: '11px', color: '#64748b', marginTop: '-4px' }}>
+                When customers reach <strong>Ready</strong> or <strong>Delivered</strong>, a button will invite them to review your business.
+              </span>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                <button type="submit" style={styles.btnPrimary} disabled={settingsSaving}>
+                  {settingsSaving ? 'Saving...' : 'Save Settings'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsModal(false)}
+                  style={styles.btnCancel}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* REVENUE HISTORY MODAL */}
@@ -1537,6 +1655,16 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  btnHeaderSettings: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    color: '#ffffff',
+    border: 'none',
+    padding: '6px 10px',
+    borderRadius: '6px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    fontSize: '12px',
   },
   warningBannerCard: {
     backgroundColor: '#fef08a',
@@ -1894,6 +2022,19 @@ const styles = {
     fontSize: '14px',
     cursor: 'pointer',
     marginTop: '10px',
+  },
+  btnGoogleReview: {
+    display: 'block',
+    backgroundColor: '#fef3c7',
+    color: '#b45309',
+    border: '1px solid #fde047',
+    padding: '12px 14px',
+    borderRadius: '10px',
+    fontWeight: 'bold',
+    textDecoration: 'none',
+    fontSize: '13px',
+    textAlign: 'center',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
   },
   bankBox: {
     backgroundColor: '#eff6ff',
