@@ -622,15 +622,17 @@ export default function App() {
                 {trackedJob.status === 'Delivered' && '✅ Device collected and repair job closed.'}
               </div>
 
+              {/* DISTINCT, TAPPABLE GOOGLE REVIEW BUTTON */}
               {(currentStep >= 3) && trackedJob.google_review_url && (
                 <div style={{ marginBottom: '16px' }}>
                   <a
                     href={trackedJob.google_review_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={styles.btnGoogleReview}
+                    style={styles.btnGoogleReviewButton}
                   >
-                    ⭐ Satisfied with our repair? Leave us a Google Review!
+                    <span>⭐ Rate Your Experience on Google Maps</span>
+                    <span style={{ fontSize: '16px' }}>↗</span>
                   </a>
                 </div>
               )}
@@ -1114,13 +1116,13 @@ export default function App() {
             </div>
           </div>
 
-          {/* DEDICATED CLEAN ACTION TOOLBAR */}
+          {/* BALANCED CLEAN TOOLBAR */}
           <div style={styles.toolbarGrid}>
             <button onClick={() => setShowSettingsModal(true)} style={styles.btnToolSecondary}>
-              ⚙️ Shop Name & Reviews
+              ⚙️ Shop Settings
             </button>
             <button onClick={exportToCSV} style={styles.btnToolPrimary}>
-              📥 Export Excel (CSV)
+              📥 Export (CSV)
             </button>
           </div>
 
@@ -1354,15 +1356,15 @@ export default function App() {
       {showSettingsModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
-            <h3 style={{ marginTop: 0, color: '#0f172a' }}>⚙️ Shop Branding & Google Reviews</h3>
+            <h3 style={{ marginTop: 0, color: '#0f172a' }}>⚙️ Shop Settings & Branding</h3>
             <p style={{ color: '#475569', fontSize: '13px', lineHeight: '1.4', marginBottom: '14px' }}>
-              Customize how your shop appears to customers on their live tracking links:
+              Customize your shop brand and review link shown on customer tracking links:
             </p>
             <form onSubmit={handleSaveShopSettings} style={styles.formGrid}>
-              <label style={styles.label}>Shop Name (Shown on tracking header)</label>
+              <label style={styles.label}>Shop Name (Shown on customer page)</label>
               <input
                 type="text"
-                placeholder="e.g. Kandy Mobile Care"
+                placeholder="e.g. Colombo Care"
                 value={shopNameInput}
                 onChange={(e) => setShopNameInput(e.target.value)}
                 style={styles.input}
@@ -1378,7 +1380,7 @@ export default function App() {
                 style={styles.input}
               />
               <span style={{ fontSize: '11px', color: '#64748b', marginTop: '-4px' }}>
-                When customers reach <strong>Ready</strong> or <strong>Delivered</strong>, a button will invite them to review your business.
+                When repairs reach <strong>Ready</strong> or <strong>Delivered</strong>, a prominent button invites customers to rate your shop.
               </span>
 
               <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
@@ -1646,7 +1648,7 @@ function getStatusBannerStyle(status) {
     padding: '10px 12px',
     fontSize: '13px',
     fontWeight: '600',
-    marginBottom: '18px',
+    marginBottom: '14px',
     lineHeight: '1.4',
   }
 }
@@ -1688,6 +1690,7 @@ const styles = {
     fontSize: '12px',
     cursor: 'pointer',
     textAlign: 'center',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
   },
   btnToolPrimary: {
     backgroundColor: '#10b981',
@@ -1699,6 +1702,7 @@ const styles = {
     fontSize: '12px',
     cursor: 'pointer',
     textAlign: 'center',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
   },
   warningBannerCard: {
     backgroundColor: '#fef08a',
@@ -2048,18 +2052,20 @@ const styles = {
     cursor: 'pointer',
     marginTop: '10px',
   },
-  btnGoogleReview: {
-    display: 'block',
-    backgroundColor: '#fef3c7',
-    color: '#b45309',
-    border: '1px solid #fde047',
-    padding: '12px 14px',
+  btnGoogleReviewButton: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    color: '#1e293b',
+    border: '2px solid #e2e8f0',
+    padding: '12px 16px',
     borderRadius: '10px',
     fontWeight: 'bold',
     textDecoration: 'none',
     fontSize: '13px',
-    textAlign: 'center',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+    boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+    transition: 'all 0.2s ease',
   },
   bankBox: {
     backgroundColor: '#eff6ff',
