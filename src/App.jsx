@@ -708,7 +708,7 @@ export default function App() {
                   </p>
                 )}
                 {hasWarranty && (
-                  <p style={{ ...styles.trackingRow, color: '#16a34a' }}>
+                  <p style={styles.trackingRow}>
                     <span>🛡️ Warranty Coverage:</span>{' '}
                     <strong>{trackedJob.warranty}</strong>
                   </p>
@@ -885,11 +885,17 @@ export default function App() {
     }
   }
 
+  // FIXED STATUS TRANSITION: Resets completed_at to null if moved back to Received / In Progress
   async function updateStatus(id, newStatus, currentJob) {
     const updatePayload = { status: newStatus }
 
-    if ((newStatus === 'Ready' || newStatus === 'Delivered') && !currentJob.completed_at) {
-      updatePayload.completed_at = new Date().toISOString()
+    if (newStatus === 'Ready' || newStatus === 'Delivered') {
+      if (!currentJob.completed_at) {
+        updatePayload.completed_at = new Date().toISOString()
+      }
+    } else {
+      // Received or In Progress -> Reset completed_at to null cleanly
+      updatePayload.completed_at = null
     }
 
     const { error } = await supabase
@@ -1404,7 +1410,7 @@ export default function App() {
                         <span>🔧 Fault:</span> <strong>{job.issue || '-'}</strong>
                       </p>
                       {job.warranty && job.warranty !== 'None' && (
-                        <p style={{ ...styles.jobText, color: '#16a34a' }}>
+                        <p style={styles.jobText}>
                           <span>🛡️ Warranty:</span> <strong>{job.warranty}</strong>
                         </p>
                       )}
@@ -1422,13 +1428,13 @@ export default function App() {
                       </p>
                     </div>
 
-                    {/* NEATLY SEPARATED DATE LABELS */}
+                    {/* CLEANLY STYLED, SEPARATE DATE ROWS */}
                     <div style={styles.dateBlock}>
                       <div style={styles.dateLabelRow}>
                         <span>📅 Logged:</span> {formatDate(job.created_at)}
                       </div>
                       {job.completed_at && (
-                        <div style={{ ...styles.dateLabelRow, color: '#059669', fontWeight: '600' }}>
+                        <div style={styles.dateLabelRow}>
                           <span>✅ Completed:</span> {formatDate(job.completed_at)}
                         </div>
                       )}
@@ -1777,31 +1783,23 @@ export default function App() {
   )
 }
 
-function getStatusBannerStyle(status) {
-  let bg = '#fef3c7'
-  let color = '#92400e'
-  let border = '#fde68a'
-
-  if (status === 'In Progress') {
-    bg = '#e0f2fe'
-    color = '#075985'
-    border = '#bae6fd'
-  } else if (status === 'Ready' || status === 'Delivered') {
-    bg = '#dcfce7'
-    color = '#166534'
-    border = '#bbf7d0'
-  }
+function getStatusStyle(status) {
+  let bg = '#e2e8f0'
+  let color = '#334155'
+  if (status === 'Received') { bg = '#fef08a'; color = '#854d0e'; }
+  if (status === 'In Progress') { bg = '#bae6fd'; color = '#0369a1'; }
+  if (status === 'Ready') { bg = '#bbf7d0'; color = '#15803d'; }
+  if (status === 'Delivered') { bg = '#e2e8f0'; color = '#64748b'; }
 
   return {
     backgroundColor: bg,
     color: color,
-    border: `1px solid ${border}`,
-    borderRadius: '8px',
-    padding: '10px 12px',
-    fontSize: '13px',
-    fontWeight: '600',
-    marginBottom: '14px',
-    lineHeight: '1.4',
+    border: 'none',
+    padding: '5px 10px',
+    borderRadius: '6px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    fontSize: '12px',
   }
 }
 
@@ -2147,7 +2145,7 @@ const styles = {
     borderRadius: '8px',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     zIndex: 10,
-    minWidth: '130px',
+    minWidth: '140px',
     overflow: 'hidden',
   },
   dropdownItem: {
