@@ -26,14 +26,12 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeMenuId, setActiveMenuId] = useState(null)
   const [editingJob, setEditingJob] = useState(null)
-  const [receiptJob, setReceiptJob] = useState(null)
   const [showPayModal, setShowPayModal] = useState(false)
   const [showRevenueHistoryModal, setShowRevenueHistoryModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
 
   // Shop Settings State
   const [shopNameInput, setShopNameInput] = useState('')
-  const [shopPhoneInput, setShopPhoneInput] = useState('')
   const [googleReviewInput, setGoogleReviewInput] = useState('')
   const [newPasswordInput, setNewPasswordInput] = useState('')
   const [showNewPassword, setShowNewPassword] = useState(false)
@@ -113,7 +111,6 @@ export default function App() {
       if (data) {
         setProfile(data)
         setShopNameInput(data.shop_name || 'FixTrack')
-        setShopPhoneInput(data.phone_number || '')
         setGoogleReviewInput(data.google_review_url || '')
       } else {
         const isAdmin = user.email === MASTER_ADMIN_EMAIL
@@ -123,14 +120,12 @@ export default function App() {
           role: isAdmin ? 'admin' : 'shop',
           status: 'active',
           shop_name: 'FixTrack',
-          phone_number: '',
           google_review_url: '',
           monthly_rate: 2000,
           expiry_date: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
         }
         setProfile(fallbackProfile)
         setShopNameInput('FixTrack')
-        setShopPhoneInput('')
         setGoogleReviewInput('')
       }
     } catch (err) {
@@ -282,19 +277,12 @@ export default function App() {
     e.preventDefault()
     setSettingsSaving(true)
     const cleanShopName = shopNameInput.trim() || 'FixTrack'
-    const cleanShopPhone = shopPhoneInput.trim()
     const cleanReviewUrl = googleReviewInput.trim()
-
-    let formattedPhone = cleanShopPhone
-    if (formattedPhone.startsWith('0')) {
-      formattedPhone = '94' + formattedPhone.slice(1)
-    }
 
     const { error: profileError } = await supabase
       .from('profiles')
       .update({
         shop_name: cleanShopName,
-        phone_number: formattedPhone,
         google_review_url: cleanReviewUrl,
       })
       .eq('id', session.user.id)
@@ -325,7 +313,6 @@ export default function App() {
     setProfile((prev) => ({
       ...prev,
       shop_name: cleanShopName,
-      phone_number: formattedPhone,
       google_review_url: cleanReviewUrl,
     }))
     setNewPasswordInput('')
@@ -1390,15 +1377,6 @@ export default function App() {
                             <div style={styles.dropdownMenu}>
                               <button
                                 onClick={() => {
-                                  setReceiptJob(job)
-                                  setActiveMenuId(null)
-                                }}
-                                style={styles.dropdownItem}
-                              >
-                                🖨️ Print Slip / Receipt
-                              </button>
-                              <button
-                                onClick={() => {
                                   setEditingJob(job)
                                   setActiveMenuId(null)
                                 }}
@@ -1444,9 +1422,16 @@ export default function App() {
                       </p>
                     </div>
 
-                    <div style={styles.dateLabel}>
-                      📅 Logged: {formatDate(job.created_at)}
-                      {job.completed_at && ` • Completed: ${formatDate(job.completed_at)}`}
+                    {/* NEATLY SEPARATED DATE LABELS */}
+                    <div style={styles.dateBlock}>
+                      <div style={styles.dateLabelRow}>
+                        <span>📅 Logged:</span> {formatDate(job.created_at)}
+                      </div>
+                      {job.completed_at && (
+                        <div style={{ ...styles.dateLabelRow, color: '#059669', fontWeight: '600' }}>
+                          <span>✅ Completed:</span> {formatDate(job.completed_at)}
+                        </div>
+                      )}
                     </div>
 
                     {job.status !== 'Delivered' && (
@@ -1474,107 +1459,16 @@ export default function App() {
         </footer>
       )}
 
-      {/* PRINTABLE RECEIPT / SLIP MODAL */}
-      {receiptJob && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <div id="printable-receipt-card" style={styles.receiptPaper}>
-              <div style={{ textAlign: 'center', borderBottom: '1px dashed #cbd5e1', paddingBottom: '12px', marginBottom: '12px' }}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', color: '#0f172a' }}>{currentShopBrandTitle}</h3>
-                {profile?.phone_number && (
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    Tel: {formatDisplayPhone(profile.phone_number)}
-                  </div>
-                )}
-                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#2563eb', marginTop: '6px', letterSpacing: '0.5px' }}>
-                  {receiptJob.status === 'Ready' || receiptJob.status === 'Delivered' ? 'REPAIR & PAYMENT RECEIPT' : 'DEVICE INTAKE SLIP'}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
-                <span>Job Reference:</span> <strong>#{receiptJob.shopNum}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
-                <span>Date:</span> <strong>{formatDateOnly(receiptJob.created_at)}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
-                <span>Customer:</span> <strong>{receiptJob.customer_name}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
-                <span>Phone:</span> <strong>{formatDisplayPhone(receiptJob.phone_number)}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
-                <span>Device:</span> <strong>{receiptJob.device_model}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
-                <span>Fault:</span> <strong>{receiptJob.issue || 'Service'}</strong>
-              </div>
-              {receiptJob.warranty && receiptJob.warranty !== 'None' && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0', color: '#16a34a' }}>
-                  <span>Warranty:</span> <strong>{receiptJob.warranty}</strong>
-                </div>
-              )}
-              {receiptJob.completed_at && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
-                  <span>Completed On:</span> <strong>{formatDateOnly(receiptJob.completed_at)}</strong>
-                </div>
-              )}
-
-              <div style={{ borderTop: '1px dashed #cbd5e1', borderBottom: '1px dashed #cbd5e1', padding: '8px 0', margin: '10px 0', display: 'flex', justifyContent: 'space-between', fontSize: '15px' }}>
-                <strong>TOTAL {receiptJob.status === 'Delivered' ? 'PAID' : 'ESTIMATE'}:</strong>
-                <strong style={{ color: '#0f172a' }}>{formatCostDisplay(receiptJob.cost)}</strong>
-              </div>
-
-              {/* QR CODE FOR LIVE STATUS / REVIEWS */}
-              <div style={{ textAlign: 'center', marginTop: '12px' }}>
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(
-                    receiptJob.status === 'Delivered' && profile?.google_review_url
-                      ? profile.google_review_url
-                      : `${window.location.origin}?track=${receiptJob.id}`
-                  )}`}
-                  alt="QR Code"
-                  style={{ width: '100px', height: '100px', borderRadius: '6px', border: '1px solid #e2e8f0', padding: '4px' }}
-                />
-                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                  {receiptJob.status === 'Delivered' && profile?.google_review_url
-                    ? 'Scan to rate us on Google Maps!'
-                    : 'Scan QR to track live repair status'}
-                </div>
-                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#334155', marginTop: '8px' }}>
-                  Thank You!
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
-              <button
-                onClick={() => window.print()}
-                style={styles.btnPrimary}
-              >
-                🖨️ Print / Save PDF
-              </button>
-              <button
-                onClick={() => setReceiptJob(null)}
-                style={styles.btnCancel}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* SHOP SETTINGS & SECURITY MODAL */}
       {showSettingsModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
             <h3 style={{ marginTop: 0, color: '#0f172a' }}>⚙️ Shop Settings & Security</h3>
             <p style={{ color: '#475569', fontSize: '13px', lineHeight: '1.4', marginBottom: '14px' }}>
-              Configure your shop brand, contact info, and account credentials:
+              Configure your shop brand, review link, and account credentials:
             </p>
             <form onSubmit={handleSaveShopSettings} style={styles.formGrid}>
-              <label style={styles.label}>Shop Name (Shown on tracking header & receipts)</label>
+              <label style={styles.label}>Shop Name (Shown on tracking header)</label>
               <input
                 type="text"
                 placeholder="e.g. Colombo Care"
@@ -1582,15 +1476,6 @@ export default function App() {
                 onChange={(e) => setShopNameInput(e.target.value)}
                 style={styles.input}
                 required
-              />
-
-              <label style={styles.label}>Shop Contact Phone (Shown on receipts)</label>
-              <input
-                type="tel"
-                placeholder="e.g. 0771234567"
-                value={formatDisplayPhone(shopPhoneInput)}
-                onChange={(e) => setShopPhoneInput(e.target.value)}
-                style={styles.input}
               />
 
               <label style={styles.label}>Google Maps Review Link (Optional)</label>
@@ -2262,7 +2147,7 @@ const styles = {
     borderRadius: '8px',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     zIndex: 10,
-    minWidth: '160px',
+    minWidth: '130px',
     overflow: 'hidden',
   },
   dropdownItem: {
@@ -2287,10 +2172,15 @@ const styles = {
     fontSize: '13px',
     color: '#334155',
   },
-  dateLabel: {
+  dateBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+    marginBottom: '8px',
+  },
+  dateLabelRow: {
     fontSize: '11px',
     color: '#64748b',
-    marginBottom: '8px',
   },
   jobCardActions: {
     borderTop: '1px solid #f1f5f9',
@@ -2451,13 +2341,6 @@ const styles = {
     width: '100%',
     maxWidth: '450px',
     boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-  },
-  receiptPaper: {
-    backgroundColor: '#ffffff',
-    border: '1px solid #cbd5e1',
-    borderRadius: '8px',
-    padding: '16px',
-    color: '#0f172a',
   },
 }
 
