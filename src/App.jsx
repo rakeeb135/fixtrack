@@ -893,7 +893,6 @@ export default function App() {
         updatePayload.completed_at = new Date().toISOString()
       }
     } else {
-      // Reverted to Received or In Progress -> safely clear completed_at
       updatePayload.completed_at = null
     }
 
@@ -1782,6 +1781,34 @@ export default function App() {
   )
 }
 
+function getStatusBannerStyle(status) {
+  let bg = '#fef3c7'
+  let color = '#92400e'
+  let border = '#fde68a'
+
+  if (status === 'In Progress') {
+    bg = '#e0f2fe'
+    color = '#075985'
+    border = '#bae6fd'
+  } else if (status === 'Ready' || status === 'Delivered') {
+    bg = '#dcfce7'
+    color = '#166534'
+    border = '#bbf7d0'
+  }
+
+  return {
+    backgroundColor: bg,
+    color: color,
+    border: `1px solid ${border}`,
+    borderRadius: '8px',
+    padding: '10px 12px',
+    fontSize: '13px',
+    fontWeight: '600',
+    marginBottom: '14px',
+    lineHeight: '1.4',
+  }
+}
+
 function getStatusStyle(status) {
   let bg = '#e2e8f0'
   let color = '#334155'
@@ -2339,24 +2366,4 @@ const styles = {
     maxWidth: '450px',
     boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
   },
-}
-
-function getStatusStyle(status) {
-  let bg = '#e2e8f0'
-  let color = '#334155'
-  if (status === 'Received') { bg = '#fef08a'; color = '#854d0e'; }
-  if (status === 'In Progress') { bg = '#bae6fd'; color = '#0369a1'; }
-  if (status === 'Ready') { bg = '#bbf7d0'; color = '#15803d'; }
-  if (status === 'Delivered') { bg = '#e2e8f0'; color = '#64748b'; }
-
-  return {
-    backgroundColor: bg,
-    color: color,
-    border: 'none',
-    padding: '5px 10px',
-    borderRadius: '6px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    fontSize: '12px',
-  }
 }
