@@ -26,13 +26,17 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeMenuId, setActiveMenuId] = useState(null)
   const [editingJob, setEditingJob] = useState(null)
+  const [receiptJob, setReceiptJob] = useState(null)
   const [showPayModal, setShowPayModal] = useState(false)
   const [showRevenueHistoryModal, setShowRevenueHistoryModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
 
   // Shop Settings State
   const [shopNameInput, setShopNameInput] = useState('')
+  const [shopPhoneInput, setShopPhoneInput] = useState('')
   const [googleReviewInput, setGoogleReviewInput] = useState('')
+  const [newPasswordInput, setNewPasswordInput] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
   const [settingsSaving, setSettingsSaving] = useState(false)
 
   // Admin Dashboard State
@@ -57,8 +61,10 @@ export default function App() {
   const [issue, setIssue] = useState('')
   const [notes, setNotes] = useState('')
   const [cost, setCost] = useState('')
+  const [warranty, setWarranty] = useState('')
 
   const DEFAULT_FAULTS = ['Display', 'Battery', 'Charging', 'No Power', 'Speaker']
+  const WARRANTY_PRESETS = ['None', '3 Days', '7 Days', '1 Month', '3 Months', '6 Months']
 
   function appendFaultTag(tag) {
     if (!issue) {
@@ -107,6 +113,7 @@ export default function App() {
       if (data) {
         setProfile(data)
         setShopNameInput(data.shop_name || 'FixTrack')
+        setShopPhoneInput(data.phone_number || '')
         setGoogleReviewInput(data.google_review_url || '')
       } else {
         const isAdmin = user.email === MASTER_ADMIN_EMAIL
@@ -116,12 +123,14 @@ export default function App() {
           role: isAdmin ? 'admin' : 'shop',
           status: 'active',
           shop_name: 'FixTrack',
+          phone_number: '',
           google_review_url: '',
           monthly_rate: 2000,
           expiry_date: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
         }
         setProfile(fallbackProfile)
         setShopNameInput('FixTrack')
+        setShopPhoneInput('')
         setGoogleReviewInput('')
       }
     } catch (err) {
@@ -268,33 +277,60 @@ export default function App() {
     setProfile(null)
   }
 
-  // --- SHOP SETTINGS HANDLER ---
+  // --- SHOP SETTINGS & PASSWORD HANDLER ---
   async function handleSaveShopSettings(e) {
     e.preventDefault()
     setSettingsSaving(true)
     const cleanShopName = shopNameInput.trim() || 'FixTrack'
+    const cleanShopPhone = shopPhoneInput.trim()
     const cleanReviewUrl = googleReviewInput.trim()
 
-    const { error } = await supabase
+    let formattedPhone = cleanShopPhone
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '94' + formattedPhone.slice(1)
+    }
+
+    const { error: profileError } = await supabase
       .from('profiles')
       .update({
         shop_name: cleanShopName,
+        phone_number: formattedPhone,
         google_review_url: cleanReviewUrl,
       })
       .eq('id', session.user.id)
 
-    setSettingsSaving(false)
-    if (error) {
-      alert('Error updating settings: ' + error.message)
-    } else {
-      setProfile((prev) => ({
-        ...prev,
-        shop_name: cleanShopName,
-        google_review_url: cleanReviewUrl,
-      }))
-      setShowSettingsModal(false)
-      alert('Settings saved successfully!')
+    if (profileError) {
+      setSettingsSaving(false)
+      alert('Error updating settings: ' + profileError.message)
+      return
     }
+
+    if (newPasswordInput.trim()) {
+      if (newPasswordInput.trim().length < 6) {
+        setSettingsSaving(false)
+        alert('New password must be at least 6 characters.')
+        return
+      }
+      const { error: passwordError } = await supabase.auth.updateUser({
+        password: newPasswordInput.trim(),
+      })
+      if (passwordError) {
+        setSettingsSaving(false)
+        alert('Settings saved, but failed to change password: ' + passwordError.message)
+        return
+      }
+    }
+
+    setSettingsSaving(false)
+    setProfile((prev) => ({
+      ...prev,
+      shop_name: cleanShopName,
+      phone_number: formattedPhone,
+      google_review_url: cleanReviewUrl,
+    }))
+    setNewPasswordInput('')
+    setShowSettingsModal(false)
+    alert('Shop settings updated successfully!')
   }
 
   // --- ADMIN ACTIONS ---
@@ -455,10 +491,12 @@ export default function App() {
       'Phone Number',
       'Device Model',
       'Issue Fault',
+      'Warranty',
       'Notes',
       'Cost LKR',
       'Status',
       'Date Logged',
+      'Date Completed',
     ]
 
     const rows = repairsWithShopNum.map((job) => [
@@ -467,10 +505,12 @@ export default function App() {
       `"\t${formatDisplayPhone(job.phone_number)}"`,
       `"${job.device_model || ''}"`,
       `"${job.issue || ''}"`,
+      `"${job.warranty || 'None'}"`,
       `"${job.notes || ''}"`,
       job.cost || 0,
       `"${job.status || 'Received'}"`,
       `"${formatDate(job.created_at)}"`,
+      `"${formatDate(job.completed_at)}"`,
     ])
 
     const csvString = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
@@ -496,6 +536,7 @@ export default function App() {
     const statusOrder = { 'Received': 1, 'In Progress': 2, 'Ready': 3, 'Delivered': 4 }
     const currentStep = trackedJob ? (statusOrder[trackedJob.status] || 1) : 1
     const displayShopTitle = trackedJob?.shop_name || 'FixTrack'
+    const hasWarranty = trackedJob?.warranty && trackedJob.warranty !== 'None'
 
     return (
       <div style={styles.container}>
@@ -622,7 +663,7 @@ export default function App() {
                 {trackedJob.status === 'Delivered' && '✅ Device collected and repair job closed.'}
               </div>
 
-              {/* PREMIUM HIGH-CONVERTING GOOGLE REVIEW ACTION CARD */}
+              {/* GOOGLE REVIEW ACTION CARD */}
               {(currentStep >= 3) && trackedJob.google_review_url && (
                 <div style={{ marginBottom: '18px' }}>
                   <a
@@ -632,7 +673,6 @@ export default function App() {
                     style={styles.googleReviewActionCard}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      {/* Official Google "G" Vector Icon */}
                       <svg width="24" height="24" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
                         <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
                         <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.15C3.25 21.36 7.34 24 12 24z"/>
@@ -674,6 +714,18 @@ export default function App() {
                   <span>Logged Date:</span>{' '}
                   <strong>{formatDate(trackedJob.created_at)}</strong>
                 </p>
+                {trackedJob.completed_at && (
+                  <p style={styles.trackingRow}>
+                    <span>Completed Date:</span>{' '}
+                    <strong>{formatDate(trackedJob.completed_at)}</strong>
+                  </p>
+                )}
+                {hasWarranty && (
+                  <p style={{ ...styles.trackingRow, color: '#16a34a' }}>
+                    <span>🛡️ Warranty Coverage:</span>{' '}
+                    <strong>{trackedJob.warranty}</strong>
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -826,6 +878,7 @@ export default function App() {
         issue: issue,
         notes: notes,
         cost: cost ? parseInt(cost) : 0,
+        warranty: warranty.trim() && warranty !== 'None' ? warranty.trim() : null,
         status: 'Received',
         user_id: session.user.id,
       },
@@ -840,14 +893,21 @@ export default function App() {
       setIssue('')
       setNotes('')
       setCost('')
+      setWarranty('')
       fetchRepairs()
     }
   }
 
-  async function updateStatus(id, newStatus) {
+  async function updateStatus(id, newStatus, currentJob) {
+    const updatePayload = { status: newStatus }
+
+    if ((newStatus === 'Ready' || newStatus === 'Delivered') && !currentJob.completed_at) {
+      updatePayload.completed_at = new Date().toISOString()
+    }
+
     const { error } = await supabase
       .from('repairs')
-      .update({ status: newStatus })
+      .update(updatePayload)
       .eq('id', id)
 
     if (!error) fetchRepairs()
@@ -865,7 +925,7 @@ export default function App() {
 
   async function handleSaveEdit(e) {
     e.preventDefault()
-    const { id, customer_name, phone_number, device_model, issue, notes, cost } = editingJob
+    const { id, customer_name, phone_number, device_model, issue, notes, cost, warranty } = editingJob
 
     let formattedPhone = phone_number.trim()
     if (formattedPhone.startsWith('0')) {
@@ -881,6 +941,7 @@ export default function App() {
         issue,
         notes,
         cost: parseInt(cost) || 0,
+        warranty: warranty && warranty !== 'None' ? warranty : null,
       })
       .eq('id', id)
 
@@ -921,6 +982,7 @@ export default function App() {
         job.device_model?.toLowerCase().includes(query) ||
         job.issue?.toLowerCase().includes(query) ||
         job.notes?.toLowerCase().includes(query) ||
+        job.warranty?.toLowerCase().includes(query) ||
         job.status?.toLowerCase().includes(query)
       )
     }
@@ -1205,6 +1267,33 @@ export default function App() {
                 </div>
               </div>
 
+              <div>
+                <input
+                  type="text"
+                  placeholder="Warranty (Optional - e.g. 1 Month, 7 Days)"
+                  value={warranty}
+                  onChange={(e) => setWarranty(e.target.value)}
+                  style={styles.input}
+                />
+                <div style={styles.presetContainer}>
+                  {WARRANTY_PRESETS.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setWarranty(tag === 'None' ? '' : tag)}
+                      style={{
+                        ...styles.presetChip,
+                        backgroundColor: (warranty === tag || (tag === 'None' && !warranty)) ? '#dbeafe' : '#f1f5f9',
+                        borderColor: (warranty === tag || (tag === 'None' && !warranty)) ? '#3b82f6' : '#cbd5e1',
+                        color: (warranty === tag || (tag === 'None' && !warranty)) ? '#1d4ed8' : '#334155',
+                      }}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <input
                 type="text"
                 placeholder="Internal Notes (e.g. Password: 1234)"
@@ -1274,7 +1363,7 @@ export default function App() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <select
                           value={job.status}
-                          onChange={(e) => updateStatus(job.id, e.target.value)}
+                          onChange={(e) => updateStatus(job.id, e.target.value, job)}
                           style={{
                             ...getStatusStyle(job.status),
                             paddingRight: '22px',
@@ -1299,6 +1388,15 @@ export default function App() {
 
                           {activeMenuId === job.id && (
                             <div style={styles.dropdownMenu}>
+                              <button
+                                onClick={() => {
+                                  setReceiptJob(job)
+                                  setActiveMenuId(null)
+                                }}
+                                style={styles.dropdownItem}
+                              >
+                                🖨️ Print Slip / Receipt
+                              </button>
                               <button
                                 onClick={() => {
                                   setEditingJob(job)
@@ -1327,6 +1425,11 @@ export default function App() {
                       <p style={styles.jobText}>
                         <span>🔧 Fault:</span> <strong>{job.issue || '-'}</strong>
                       </p>
+                      {job.warranty && job.warranty !== 'None' && (
+                        <p style={{ ...styles.jobText, color: '#16a34a' }}>
+                          <span>🛡️ Warranty:</span> <strong>{job.warranty}</strong>
+                        </p>
+                      )}
                       {job.notes && (
                         <p style={{ ...styles.jobText, color: '#64748b' }}>
                           <span>📝 Notes:</span> <em>{job.notes}</em>
@@ -1343,6 +1446,7 @@ export default function App() {
 
                     <div style={styles.dateLabel}>
                       📅 Logged: {formatDate(job.created_at)}
+                      {job.completed_at && ` • Completed: ${formatDate(job.completed_at)}`}
                     </div>
 
                     {job.status !== 'Delivered' && (
@@ -1370,16 +1474,107 @@ export default function App() {
         </footer>
       )}
 
-      {/* SHOP SETTINGS MODAL */}
+      {/* PRINTABLE RECEIPT / SLIP MODAL */}
+      {receiptJob && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <div id="printable-receipt-card" style={styles.receiptPaper}>
+              <div style={{ textAlign: 'center', borderBottom: '1px dashed #cbd5e1', paddingBottom: '12px', marginBottom: '12px' }}>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', color: '#0f172a' }}>{currentShopBrandTitle}</h3>
+                {profile?.phone_number && (
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>
+                    Tel: {formatDisplayPhone(profile.phone_number)}
+                  </div>
+                )}
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#2563eb', marginTop: '6px', letterSpacing: '0.5px' }}>
+                  {receiptJob.status === 'Ready' || receiptJob.status === 'Delivered' ? 'REPAIR & PAYMENT RECEIPT' : 'DEVICE INTAKE SLIP'}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
+                <span>Job Reference:</span> <strong>#{receiptJob.shopNum}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
+                <span>Date:</span> <strong>{formatDateOnly(receiptJob.created_at)}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
+                <span>Customer:</span> <strong>{receiptJob.customer_name}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
+                <span>Phone:</span> <strong>{formatDisplayPhone(receiptJob.phone_number)}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
+                <span>Device:</span> <strong>{receiptJob.device_model}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
+                <span>Fault:</span> <strong>{receiptJob.issue || 'Service'}</strong>
+              </div>
+              {receiptJob.warranty && receiptJob.warranty !== 'None' && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0', color: '#16a34a' }}>
+                  <span>Warranty:</span> <strong>{receiptJob.warranty}</strong>
+                </div>
+              )}
+              {receiptJob.completed_at && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', margin: '4px 0' }}>
+                  <span>Completed On:</span> <strong>{formatDateOnly(receiptJob.completed_at)}</strong>
+                </div>
+              )}
+
+              <div style={{ borderTop: '1px dashed #cbd5e1', borderBottom: '1px dashed #cbd5e1', padding: '8px 0', margin: '10px 0', display: 'flex', justifyContent: 'space-between', fontSize: '15px' }}>
+                <strong>TOTAL {receiptJob.status === 'Delivered' ? 'PAID' : 'ESTIMATE'}:</strong>
+                <strong style={{ color: '#0f172a' }}>{formatCostDisplay(receiptJob.cost)}</strong>
+              </div>
+
+              {/* QR CODE FOR LIVE STATUS / REVIEWS */}
+              <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(
+                    receiptJob.status === 'Delivered' && profile?.google_review_url
+                      ? profile.google_review_url
+                      : `${window.location.origin}?track=${receiptJob.id}`
+                  )}`}
+                  alt="QR Code"
+                  style={{ width: '100px', height: '100px', borderRadius: '6px', border: '1px solid #e2e8f0', padding: '4px' }}
+                />
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                  {receiptJob.status === 'Delivered' && profile?.google_review_url
+                    ? 'Scan to rate us on Google Maps!'
+                    : 'Scan QR to track live repair status'}
+                </div>
+                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#334155', marginTop: '8px' }}>
+                  Thank You!
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
+              <button
+                onClick={() => window.print()}
+                style={styles.btnPrimary}
+              >
+                🖨️ Print / Save PDF
+              </button>
+              <button
+                onClick={() => setReceiptJob(null)}
+                style={styles.btnCancel}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SHOP SETTINGS & SECURITY MODAL */}
       {showSettingsModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
-            <h3 style={{ marginTop: 0, color: '#0f172a' }}>⚙️ Shop Settings & Branding</h3>
+            <h3 style={{ marginTop: 0, color: '#0f172a' }}>⚙️ Shop Settings & Security</h3>
             <p style={{ color: '#475569', fontSize: '13px', lineHeight: '1.4', marginBottom: '14px' }}>
-              Customize your shop brand and review link shown on customer tracking links:
+              Configure your shop brand, contact info, and account credentials:
             </p>
             <form onSubmit={handleSaveShopSettings} style={styles.formGrid}>
-              <label style={styles.label}>Shop Name (Shown on customer page)</label>
+              <label style={styles.label}>Shop Name (Shown on tracking header & receipts)</label>
               <input
                 type="text"
                 placeholder="e.g. Colombo Care"
@@ -1387,6 +1582,15 @@ export default function App() {
                 onChange={(e) => setShopNameInput(e.target.value)}
                 style={styles.input}
                 required
+              />
+
+              <label style={styles.label}>Shop Contact Phone (Shown on receipts)</label>
+              <input
+                type="tel"
+                placeholder="e.g. 0771234567"
+                value={formatDisplayPhone(shopPhoneInput)}
+                onChange={(e) => setShopPhoneInput(e.target.value)}
+                style={styles.input}
               />
 
               <label style={styles.label}>Google Maps Review Link (Optional)</label>
@@ -1397,8 +1601,39 @@ export default function App() {
                 onChange={(e) => setGoogleReviewInput(e.target.value)}
                 style={styles.input}
               />
+
+              <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '8px 0' }} />
+
+              <label style={styles.label}>🔑 Change Account Password (Optional)</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  placeholder="Enter new password (min 6 characters)"
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                  style={{ ...styles.input, paddingRight: '40px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  style={styles.btnEyeToggle}
+                  title={showNewPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showNewPassword ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.45 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
               <span style={{ fontSize: '11px', color: '#64748b', marginTop: '-4px' }}>
-                When repairs reach <strong>Ready</strong> or <strong>Delivered</strong>, an official Google Review action card invites customers to rate your shop.
+                Leave blank if you don't want to change your password.
               </span>
 
               <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
@@ -1407,7 +1642,10 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowSettingsModal(false)}
+                  onClick={() => {
+                    setNewPasswordInput('')
+                    setShowSettingsModal(false)
+                  }}
                   style={styles.btnCancel}
                 >
                   Cancel
@@ -1536,6 +1774,17 @@ export default function App() {
                   setEditingJob({ ...editingJob, issue: e.target.value })
                 }
                 style={styles.input}
+              />
+
+              <label style={styles.label}>Warranty (Optional)</label>
+              <input
+                type="text"
+                value={editingJob.warranty || ''}
+                onChange={(e) =>
+                  setEditingJob({ ...editingJob, warranty: e.target.value })
+                }
+                style={styles.input}
+                placeholder="e.g. 1 Month, 7 Days"
               />
 
               <label style={styles.label}>Internal Notes</label>
@@ -2013,7 +2262,7 @@ const styles = {
     borderRadius: '8px',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     zIndex: 10,
-    minWidth: '130px',
+    minWidth: '160px',
     overflow: 'hidden',
   },
   dropdownItem: {
@@ -2203,12 +2452,19 @@ const styles = {
     maxWidth: '450px',
     boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
   },
+  receiptPaper: {
+    backgroundColor: '#ffffff',
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    padding: '16px',
+    color: '#0f172a',
+  },
 }
 
 function getStatusStyle(status) {
   let bg = '#e2e8f0'
   let color = '#334155'
-  if (status === 'Received') { bg = '#fef3c7'; color = '#854d0e'; }
+  if (status === 'Received') { bg = '#fef08a'; color = '#854d0e'; }
   if (status === 'In Progress') { bg = '#bae6fd'; color = '#0369a1'; }
   if (status === 'Ready') { bg = '#bbf7d0'; color = '#15803d'; }
   if (status === 'Delivered') { bg = '#e2e8f0'; color = '#64748b'; }
