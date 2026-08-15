@@ -885,7 +885,6 @@ export default function App() {
     }
   }
 
-  // FIXED STATUS TRANSITION: Resets completed_at to null if moved back to Received / In Progress
   async function updateStatus(id, newStatus, currentJob) {
     const updatePayload = { status: newStatus }
 
@@ -894,7 +893,7 @@ export default function App() {
         updatePayload.completed_at = new Date().toISOString()
       }
     } else {
-      // Received or In Progress -> Reset completed_at to null cleanly
+      // Reverted to Received or In Progress -> safely clear completed_at
       updatePayload.completed_at = null
     }
 
@@ -1428,7 +1427,7 @@ export default function App() {
                       </p>
                     </div>
 
-                    {/* CLEANLY STYLED, SEPARATE DATE ROWS */}
+                    {/* NEATLY SEPARATED DATE LABELS */}
                     <div style={styles.dateBlock}>
                       <div style={styles.dateLabelRow}>
                         <span>📅 Logged:</span> {formatDate(job.created_at)}
@@ -2145,7 +2144,7 @@ const styles = {
     borderRadius: '8px',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     zIndex: 10,
-    minWidth: '140px',
+    minWidth: '130px',
     overflow: 'hidden',
   },
   dropdownItem: {
