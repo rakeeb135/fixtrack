@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient'
 
 const MASTER_ADMIN_EMAIL = 'rakeebroomy@gmail.com'
 const YOUR_WHATSAPP_NUMBER = '94769944414'
+const COMPLETED_PAGE_SIZE = 50
 
 function generateTrackingToken() {
   const chars = 'abcdefghjkmnpqrstuvwxyz23456789'
@@ -27,8 +28,13 @@ export default function App() {
   const [showPassword, setShowPassword] = useState(false)
   const [authError, setAuthError] = useState('')
 
-  // Dashboard State
-  const [repairs, setRepairs] = useState([])
+  // Dashboard Repairs State
+  const [activeRepairs, setActiveRepairs] = useState([])
+  const [completedRepairs, setCompletedRepairs] = useState([])
+  const [completedPage, setCompletedPage] = useState(0)
+  const [hasMoreCompleted, setHasMoreCompleted] = useState(false)
+  const [loadingCompletedMore, setLoadingCompletedMore] = useState(false)
+
   const [trackedJob, setTrackedJob] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('active')
@@ -38,6 +44,12 @@ export default function App() {
   const [showPayModal, setShowPayModal] = useState(false)
   const [showRevenueHistoryModal, setShowRevenueHistoryModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [exportingCSV, setExportingCSV] = useState(false)
+
+  // Revenue Metrics State
+  const [monthlyRevenue, setMonthlyRevenue] = useState(0)
+  const [monthlyDeliveredCount, setMonthlyDeliveredCount] = useState(0)
+  const [monthlyRevenueHistory, setMonthlyRevenueHistory] = useState({})
 
   // Shop Settings State
   const [shopNameInput, setShopNameInput] = useState('')
@@ -148,7 +160,7 @@ export default function App() {
     if (trackingLookup) {
       fetchTrackedJob(trackingLookup)
     } else if (session) {
-      fetchRepairs()
+      fetchAllData()
     }
   }, [session, trackingLookup])
 
@@ -169,15 +181,83 @@ export default function App() {
     setLoading(false)
   }
 
-  async function fetchRepairs() {
+  async function fetchAllData() {
     setLoading(true)
+    await Promise.all([
+      fetchActiveRepairs(),
+      fetchCompletedRepairs(0, true),
+      fetchRevenueMetrics(),
+    ])
+    setLoading(false)
+  }
+
+  async function fetchActiveRepairs() {
     const { data } = await supabase
       .from('repairs')
       .select('*')
-      .order('id', { ascending: true })
+      .neq('status', 'Delivered')
+      .order('id', { ascending: false })
 
-    setRepairs(data || [])
-    setLoading(false)
+    setActiveRepairs(data || [])
+  }
+
+  async function fetchCompletedRepairs(page = 0, isInitial = false) {
+    const from = page * COMPLETED_PAGE_SIZE
+    const to = from + COMPLETED_PAGE_SIZE - 1
+
+    const { data } = await supabase
+      .from('repairs')
+      .select('*')
+      .eq('status', 'Delivered')
+      .order('id', { ascending: false })
+      .range(from, to)
+
+    const items = data || []
+    if (isInitial) {
+      setCompletedRepairs(items)
+      setCompletedPage(0)
+    } else {
+      setCompletedRepairs((prev) => [...prev, ...items])
+      setCompletedPage(page)
+    }
+
+    setHasMoreCompleted(items.length === COMPLETED_PAGE_SIZE)
+  }
+
+  async function handleLoadMoreCompleted() {
+    setLoadingCompletedMore(true)
+    await fetchCompletedRepairs(completedPage + 1, false)
+    setLoadingCompletedMore(false)
+  }
+
+  async function fetchRevenueMetrics() {
+    const { data } = await supabase
+      .from('repairs')
+      .select('cost, created_at')
+      .eq('status', 'Delivered')
+
+    if (!data) return
+
+    const now = new Date()
+    let currentMonthSum = 0
+    let currentMonthCount = 0
+    const history = {}
+
+    data.forEach((job) => {
+      if (!job.cost || job.cost <= 0) return
+      const d = new Date(job.created_at)
+      const monthKey = d.toLocaleString('en-GB', { month: 'long', year: 'numeric' })
+      history[monthKey] = (history[monthKey] || 0) + job.cost
+
+      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+        currentMonthSum += job.cost
+        currentMonthCount += 1
+      }
+    })
+
+    setMonthlyRevenue(currentMonthSum)
+    setMonthlyDeliveredCount(currentMonthCount)
+    setMonthlyRevenueHistory(history)
   }
 
   async function fetchAllProfiles() {
@@ -236,30 +316,6 @@ export default function App() {
   const isExpired = profile?.role !== 'admin' && (daysLeft <= 0 || profile?.status === 'suspended')
   const isNearExpiry = profile?.role !== 'admin' && daysLeft > 0 && daysLeft <= 3
 
-  const repairsWithShopNum = repairs.map((job, idx) => ({
-    ...job,
-    shopNum: idx + 1,
-  }))
-
-  const sortedRepairs = [...repairsWithShopNum].reverse()
-  const activeJobs = sortedRepairs.filter((j) => j.status !== 'Delivered')
-  const completedJobs = sortedRepairs.filter((j) => j.status === 'Delivered')
-
-  const now = new Date()
-  const currentMonthDelivered = completedJobs.filter((job) => {
-    const jobDate = new Date(job.created_at)
-    return jobDate.getMonth() === now.getMonth() && jobDate.getFullYear() === now.getFullYear()
-  })
-  const monthlyRevenue = currentMonthDelivered.reduce((sum, job) => sum + (job.cost || 0), 0)
-
-  const monthlyRevenueHistory = completedJobs.reduce((acc, job) => {
-    if (!job.cost || job.cost <= 0) return acc
-    const d = new Date(job.created_at)
-    const monthKey = d.toLocaleString('en-GB', { month: 'long', year: 'numeric' })
-    acc[monthKey] = (acc[monthKey] || 0) + job.cost
-    return acc
-  }, {})
-
   // --- AUTH HANDLERS ---
   async function handleLogin(e) {
     e.preventDefault()
@@ -279,7 +335,8 @@ export default function App() {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    setRepairs([])
+    setActiveRepairs([])
+    setCompletedRepairs([])
     setProfile(null)
   }
 
@@ -477,9 +534,17 @@ export default function App() {
     else fetchAllProfiles()
   }
 
-  function exportToCSV() {
-    if (repairs.length === 0) {
-      alert('No repair data available to export.')
+  // --- DEDICATED COMPLETE CSV EXPORT ---
+  async function exportToCSV() {
+    setExportingCSV(true)
+    const { data: allShopRepairs, error } = await supabase
+      .from('repairs')
+      .select('*')
+      .order('id', { ascending: true })
+
+    if (error || !allShopRepairs || allShopRepairs.length === 0) {
+      setExportingCSV(false)
+      alert('No repair records found to export.')
       return
     }
 
@@ -497,8 +562,8 @@ export default function App() {
       'Date Completed',
     ]
 
-    const rows = repairsWithShopNum.map((job) => [
-      `"#${job.shopNum}"`,
+    const rows = allShopRepairs.map((job, idx) => [
+      `"#${idx + 1}"`,
       `"${job.customer_name || ''}"`,
       `"\t${formatDisplayPhone(job.phone_number)}"`,
       `"${job.device_model || ''}"`,
@@ -521,6 +586,7 @@ export default function App() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    setExportingCSV(false)
   }
 
   function sendRenewalWhatsApp() {
@@ -563,7 +629,6 @@ export default function App() {
                 #{trackedJob.id}
               </h2>
 
-              {/* SATISFYING STEPPER */}
               <div style={styles.satisfyingStepperContainer}>
                 <div style={styles.satisfyingTrackBackground}>
                   <div
@@ -661,7 +726,6 @@ export default function App() {
                 {trackedJob.status === 'Delivered' && '✅ Device collected and repair job closed.'}
               </div>
 
-              {/* GOOGLE REVIEW ACTION CARD */}
               {(currentStep >= 3) && trackedJob.google_review_url && (
                 <div style={{ marginBottom: '18px' }}>
                   <a
@@ -895,7 +959,7 @@ export default function App() {
       setNotes('')
       setCost('')
       setWarranty('')
-      fetchRepairs()
+      fetchActiveRepairs()
     }
   }
 
@@ -915,7 +979,13 @@ export default function App() {
       .update(updatePayload)
       .eq('id', id)
 
-    if (!error) fetchRepairs()
+    if (!error) {
+      await Promise.all([
+        fetchActiveRepairs(),
+        fetchCompletedRepairs(0, true),
+        fetchRevenueMetrics(),
+      ])
+    }
   }
 
   async function deleteRepair(id) {
@@ -924,7 +994,11 @@ export default function App() {
     const { error } = await supabase.from('repairs').delete().eq('id', id)
     if (!error) {
       setActiveMenuId(null)
-      fetchRepairs()
+      await Promise.all([
+        fetchActiveRepairs(),
+        fetchCompletedRepairs(0, true),
+        fetchRevenueMetrics(),
+      ])
     }
   }
 
@@ -952,7 +1026,11 @@ export default function App() {
 
     if (!error) {
       setEditingJob(null)
-      fetchRepairs()
+      await Promise.all([
+        fetchActiveRepairs(),
+        fetchCompletedRepairs(0, true),
+        fetchRevenueMetrics(),
+      ])
     }
   }
 
@@ -979,7 +1057,7 @@ export default function App() {
     window.open(`https://wa.me/${job.phone_number}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
-  const displayedJobs = (activeTab === 'active' ? activeJobs : completedJobs).filter(
+  const displayedJobs = (activeTab === 'active' ? activeRepairs : completedRepairs).filter(
     (job) => {
       const query = searchQuery.toLowerCase()
       return (
@@ -1000,7 +1078,7 @@ export default function App() {
 
   return (
     <div style={styles.container} onClick={() => setActiveMenuId(null)}>
-      {/* UNCLUTTERED CRISP HEADER */}
+      {/* HEADER */}
       <header style={styles.header}>
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <h1 style={{ margin: 0, fontSize: '20px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
@@ -1015,7 +1093,7 @@ export default function App() {
         </button>
       </header>
 
-      {/* REFINED WARNING BANNER */}
+      {/* WARNING BANNER */}
       {isNearExpiry && (
         <div style={styles.warningBannerCard}>
           <div>
@@ -1032,7 +1110,7 @@ export default function App() {
         </div>
       )}
 
-      {/* --- MASTER ADMIN DASHBOARD VIEW --- */}
+      {/* ADMIN DASHBOARD */}
       {profile?.role === 'admin' ? (
         <div>
           {/* ONBOARD SHOP */}
@@ -1180,17 +1258,17 @@ export default function App() {
           </div>
         </div>
       ) : (
-        /* --- REGULAR SHOPKEEPER DASHBOARD --- */
+        /* SHOPKEEPER DASHBOARD */
         <div>
-          {/* MINI BUSINESS STATS BAR */}
+          {/* STATS BAR */}
           <div style={styles.statsBarGrid}>
             <div style={styles.statCard}>
               <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>IN SHOP</span>
-              <strong style={{ fontSize: '18px', color: '#2563eb' }}>{activeJobs.length} Jobs</strong>
+              <strong style={{ fontSize: '18px', color: '#2563eb' }}>{activeRepairs.length} Jobs</strong>
             </div>
             <div style={styles.statCard}>
-              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>DELIVERED</span>
-              <strong style={{ fontSize: '18px', color: '#10b981' }}>{currentMonthDelivered.length} Jobs</strong>
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>DELIVERED (MO)</span>
+              <strong style={{ fontSize: '18px', color: '#10b981' }}>{monthlyDeliveredCount} Jobs</strong>
             </div>
             <div
               style={{ ...styles.statCard, cursor: 'pointer' }}
@@ -1202,13 +1280,13 @@ export default function App() {
             </div>
           </div>
 
-          {/* BALANCED CLEAN TOOLBAR */}
+          {/* TOOLBAR */}
           <div style={styles.toolbarGrid}>
             <button onClick={() => setShowSettingsModal(true)} style={styles.btnToolSecondary}>
               ⚙️ Shop Settings
             </button>
-            <button onClick={exportToCSV} style={styles.btnToolPrimary}>
-              📥 Export (CSV)
+            <button onClick={exportToCSV} style={styles.btnToolPrimary} disabled={exportingCSV}>
+              {exportingCSV ? '⏳ Exporting...' : '📥 Export (CSV)'}
             </button>
           </div>
 
@@ -1328,13 +1406,13 @@ export default function App() {
                 onClick={() => setActiveTab('active')}
                 style={activeTab === 'active' ? styles.tabActiveBlue : styles.tabInactive}
               >
-                Active Repairs ({activeJobs.length})
+                Active Repairs ({activeRepairs.length})
               </button>
               <button
                 onClick={() => setActiveTab('completed')}
                 style={activeTab === 'completed' ? styles.tabActiveGreen : styles.tabInactive}
               >
-                Completed ({completedJobs.length})
+                Completed ({completedRepairs.length}{hasMoreCompleted ? '+' : ''})
               </button>
             </div>
 
@@ -1360,7 +1438,7 @@ export default function App() {
                   <div key={job.id} style={styles.jobCard}>
                     <div style={styles.jobCardHeader}>
                       <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <span style={styles.jobId}>#{job.shopNum}</span>
+                        <span style={styles.jobId}>#{job.id}</span>
                         <strong style={{ fontSize: '16px', marginLeft: '8px' }}>
                           {job.customer_name}
                         </strong>
@@ -1441,7 +1519,6 @@ export default function App() {
                       </p>
                     </div>
 
-                    {/* NEATLY SEPARATED DATE LABELS */}
                     <div style={styles.dateBlock}>
                       <div style={styles.dateLabelRow}>
                         <span>📅 Logged:</span> {formatDate(job.created_at)}
@@ -1465,6 +1542,17 @@ export default function App() {
                     )}
                   </div>
                 ))}
+
+                {/* LOAD MORE BUTTON FOR COMPLETED TAB */}
+                {activeTab === 'completed' && hasMoreCompleted && (
+                  <button
+                    onClick={handleLoadMoreCompleted}
+                    style={styles.btnLoadMore}
+                    disabled={loadingCompletedMore}
+                  >
+                    {loadingCompletedMore ? 'Loading older jobs...' : '⬇️ Load 50 Older Completed Jobs'}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1589,7 +1677,7 @@ export default function App() {
         </div>
       )}
 
-      {/* RENEWAL BANK DETAILS MODAL */}
+      {/* RENEWAL MODAL */}
       {showPayModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
@@ -1637,7 +1725,7 @@ export default function App() {
       {editingJob && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
-            <h3 style={{ marginTop: 0 }}>Edit Job #{editingJob.shopNum}</h3>
+            <h3 style={{ marginTop: 0 }}>Edit Job #{editingJob.id}</h3>
             <form onSubmit={handleSaveEdit} style={styles.formGrid}>
               <label style={styles.label}>Customer Name</label>
               <input
@@ -2099,6 +2187,18 @@ const styles = {
     backgroundColor: '#ffffff',
     boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
   },
+  btnLoadMore: {
+    backgroundColor: '#ffffff',
+    color: '#2563eb',
+    border: '1.5px dashed #93c5fd',
+    padding: '12px',
+    borderRadius: '10px',
+    fontWeight: 'bold',
+    fontSize: '13px',
+    cursor: 'pointer',
+    textAlign: 'center',
+    marginTop: '6px',
+  },
   adminShopCard: {
     border: '1px solid #cbd5e1',
     borderRadius: '10px',
@@ -2381,4 +2481,24 @@ const styles = {
     maxWidth: '450px',
     boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
   },
+}
+
+function getStatusStyle(status) {
+  let bg = '#e2e8f0'
+  let color = '#334155'
+  if (status === 'Received') { bg = '#fef08a'; color = '#854d0e'; }
+  if (status === 'In Progress') { bg = '#bae6fd'; color = '#0369a1'; }
+  if (status === 'Ready') { bg = '#bbf7d0'; color = '#15803d'; }
+  if (status === 'Delivered') { bg = '#e2e8f0'; color = '#64748b'; }
+
+  return {
+    backgroundColor: bg,
+    color: color,
+    border: 'none',
+    padding: '5px 10px',
+    borderRadius: '6px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    fontSize: '12px',
+  }
 }
