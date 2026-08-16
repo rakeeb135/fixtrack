@@ -4,9 +4,18 @@ import { supabase } from './supabaseClient'
 const MASTER_ADMIN_EMAIL = 'rakeebroomy@gmail.com'
 const YOUR_WHATSAPP_NUMBER = '94769944414'
 
+function generateTrackingToken() {
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789'
+  let token = ''
+  for (let i = 0; i < 8; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return token
+}
+
 export default function App() {
   const urlParams = new URLSearchParams(window.location.search)
-  const trackingJobId = urlParams.get('track')
+  const trackingLookup = urlParams.get('track')
 
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -136,12 +145,12 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (trackingJobId) {
-      fetchTrackedJob(trackingJobId)
+    if (trackingLookup) {
+      fetchTrackedJob(trackingLookup)
     } else if (session) {
       fetchRepairs()
     }
-  }, [session, trackingJobId])
+  }, [session, trackingLookup])
 
   useEffect(() => {
     if (profile?.role === 'admin') {
@@ -149,11 +158,13 @@ export default function App() {
     }
   }, [profile])
 
-  async function fetchTrackedJob(jobId) {
+  async function fetchTrackedJob(lookupKey) {
     setLoading(true)
-    const { data, error } = await supabase.rpc('get_tracked_job', { job_id: parseInt(jobId) })
+    const { data, error } = await supabase.rpc('get_tracked_job', { job_lookup: lookupKey.trim() })
     if (!error && data && data.length > 0) {
       setTrackedJob(data[0])
+    } else {
+      setTrackedJob(null)
     }
     setLoading(false)
   }
@@ -519,7 +530,7 @@ export default function App() {
   }
 
   // --- PUBLIC TRACKING VIEW ---
-  if (trackingJobId) {
+  if (trackingLookup) {
     const statusOrder = { 'Received': 1, 'In Progress': 2, 'Ready': 3, 'Delivered': 4 }
     const currentStep = trackedJob ? (statusOrder[trackedJob.status] || 1) : 1
     const displayShopTitle = trackedJob?.shop_name || 'FixTrack'
@@ -857,6 +868,8 @@ export default function App() {
       formattedPhone = '94' + formattedPhone.slice(1)
     }
 
+    const uniqueTrackingToken = generateTrackingToken()
+
     const { error } = await supabase.from('repairs').insert([
       {
         customer_name: customerName,
@@ -866,6 +879,7 @@ export default function App() {
         notes: notes,
         cost: cost ? parseInt(cost) : 0,
         warranty: warranty.trim() && warranty !== 'None' ? warranty.trim() : null,
+        tracking_token: uniqueTrackingToken,
         status: 'Received',
         user_id: session.user.id,
       },
@@ -943,7 +957,8 @@ export default function App() {
   }
 
   function sendWhatsAppNotification(job) {
-    const trackingLink = `${window.location.origin}?track=${job.id}`
+    const lookupKey = job.tracking_token || job.id
+    const trackingLink = `${window.location.origin}?track=${lookupKey}`
 
     let costString = ''
     if (job.cost && parseInt(job.cost) > 0) {
