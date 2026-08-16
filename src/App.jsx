@@ -563,7 +563,7 @@ export default function App() {
     ]
 
     const rows = allShopRepairs.map((job, idx) => [
-      `"#${idx + 1}"`,
+      `"#${job.job_number || idx + 1}"`,
       `"${job.customer_name || ''}"`,
       `"\t${formatDisplayPhone(job.phone_number)}"`,
       `"${job.device_model || ''}"`,
@@ -601,6 +601,7 @@ export default function App() {
     const currentStep = trackedJob ? (statusOrder[trackedJob.status] || 1) : 1
     const displayShopTitle = trackedJob?.shop_name || 'FixTrack'
     const hasWarranty = trackedJob?.warranty && trackedJob.warranty !== 'None'
+    const displayJobNum = trackedJob?.job_number || trackedJob?.id
 
     return (
       <div style={styles.container}>
@@ -626,7 +627,7 @@ export default function App() {
                 Repair Reference
               </span>
               <h2 style={{ fontSize: '32px', margin: '4px 0 20px 0', color: '#0f172a' }}>
-                #{trackedJob.id}
+                #{displayJobNum}
               </h2>
 
               <div style={styles.satisfyingStepperContainer}>
@@ -934,6 +935,14 @@ export default function App() {
 
     const uniqueTrackingToken = generateTrackingToken()
 
+    // Calculate next local sequential job number for this shop
+    const { count } = await supabase
+      .from('repairs')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', session.user.id)
+
+    const nextLocalJobNumber = (count || 0) + 1
+
     const { error } = await supabase.from('repairs').insert([
       {
         customer_name: customerName,
@@ -944,6 +953,7 @@ export default function App() {
         cost: cost ? parseInt(cost) : 0,
         warranty: warranty.trim() && warranty !== 'None' ? warranty.trim() : null,
         tracking_token: uniqueTrackingToken,
+        job_number: nextLocalJobNumber,
         status: 'Received',
         user_id: session.user.id,
       },
@@ -1434,114 +1444,117 @@ export default function App() {
               </p>
             ) : (
               <div style={styles.jobList}>
-                {displayedJobs.map((job) => (
-                  <div key={job.id} style={styles.jobCard}>
-                    <div style={styles.jobCardHeader}>
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <span style={styles.jobId}>#{job.id}</span>
-                        <strong style={{ fontSize: '16px', marginLeft: '8px' }}>
-                          {job.customer_name}
-                        </strong>
-                      </div>
+                {displayedJobs.map((job) => {
+                  const displayJobNumber = job.job_number || job.id
+                  return (
+                    <div key={job.id} style={styles.jobCard}>
+                      <div style={styles.jobCardHeader}>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                          <span style={styles.jobId}>#{displayJobNumber}</span>
+                          <strong style={{ fontSize: '16px', marginLeft: '8px' }}>
+                            {job.customer_name}
+                          </strong>
+                        </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <select
-                          value={job.status}
-                          onChange={(e) => updateStatus(job.id, e.target.value, job)}
-                          style={{
-                            ...getStatusStyle(job.status),
-                            paddingRight: '22px',
-                          }}
-                        >
-                          <option value="Received">Received</option>
-                          <option value="In Progress">In Progress</option>
-                          <option value="Ready">Ready</option>
-                          <option value="Delivered">Delivered</option>
-                        </select>
-
-                        <div style={{ position: 'relative' }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setActiveMenuId(activeMenuId === job.id ? null : job.id)
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <select
+                            value={job.status}
+                            onChange={(e) => updateStatus(job.id, e.target.value, job)}
+                            style={{
+                              ...getStatusStyle(job.status),
+                              paddingRight: '22px',
                             }}
-                            style={styles.btnMenuDots}
                           >
-                            ⋮
-                          </button>
+                            <option value="Received">Received</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Ready">Ready</option>
+                            <option value="Delivered">Delivered</option>
+                          </select>
 
-                          {activeMenuId === job.id && (
-                            <div style={styles.dropdownMenu}>
-                              <button
-                                onClick={() => {
-                                  setEditingJob(job)
-                                  setActiveMenuId(null)
-                                }}
-                                style={styles.dropdownItem}
-                              >
-                                ✏️ Edit Details
-                              </button>
-                              <button
-                                onClick={() => deleteRepair(job.id)}
-                                style={{ ...styles.dropdownItem, color: '#ef4444' }}
-                              >
-                                🗑️ Delete Job
-                              </button>
-                            </div>
-                          )}
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setActiveMenuId(activeMenuId === job.id ? null : job.id)
+                              }}
+                              style={styles.btnMenuDots}
+                            >
+                              ⋮
+                            </button>
+
+                            {activeMenuId === job.id && (
+                              <div style={styles.dropdownMenu}>
+                                <button
+                                  onClick={() => {
+                                    setEditingJob(job)
+                                    setActiveMenuId(null)
+                                  }}
+                                  style={styles.dropdownItem}
+                                >
+                                  ✏️ Edit Details
+                                </button>
+                                <button
+                                  onClick={() => deleteRepair(job.id)}
+                                  style={{ ...styles.dropdownItem, color: '#ef4444' }}
+                                >
+                                  🗑️ Delete Job
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div style={styles.jobCardBodyStack}>
-                      <p style={styles.jobText}>
-                        <span>📱 Device:</span> <strong>{job.device_model}</strong>
-                      </p>
-                      <p style={styles.jobText}>
-                        <span>🔧 Fault:</span> <strong>{job.issue || '-'}</strong>
-                      </p>
-                      {job.warranty && job.warranty !== 'None' && (
+                      <div style={styles.jobCardBodyStack}>
                         <p style={styles.jobText}>
-                          <span>🛡️ Warranty:</span> <strong>{job.warranty}</strong>
+                          <span>📱 Device:</span> <strong>{job.device_model}</strong>
                         </p>
-                      )}
-                      {job.notes && (
-                        <p style={{ ...styles.jobText, color: '#64748b' }}>
-                          <span>📝 Notes:</span> <em>{job.notes}</em>
+                        <p style={styles.jobText}>
+                          <span>🔧 Fault:</span> <strong>{job.issue || '-'}</strong>
                         </p>
-                      )}
-                      <p style={styles.jobText}>
-                        <span>📞 Phone:</span>{' '}
-                        <strong>{formatDisplayPhone(job.phone_number)}</strong>
-                      </p>
-                      <p style={styles.jobText}>
-                        <span>💰 Cost:</span> <strong>{formatCostDisplay(job.cost)}</strong>
-                      </p>
-                    </div>
-
-                    <div style={styles.dateBlock}>
-                      <div style={styles.dateLabelRow}>
-                        <span>📅 Logged:</span> {formatDate(job.created_at)}
+                        {job.warranty && job.warranty !== 'None' && (
+                          <p style={styles.jobText}>
+                            <span>🛡️ Warranty:</span> <strong>{job.warranty}</strong>
+                          </p>
+                        )}
+                        {job.notes && (
+                          <p style={{ ...styles.jobText, color: '#64748b' }}>
+                            <span>📝 Notes:</span> <em>{job.notes}</em>
+                          </p>
+                        )}
+                        <p style={styles.jobText}>
+                          <span>📞 Phone:</span>{' '}
+                          <strong>{formatDisplayPhone(job.phone_number)}</strong>
+                        </p>
+                        <p style={styles.jobText}>
+                          <span>💰 Cost:</span> <strong>{formatCostDisplay(job.cost)}</strong>
+                        </p>
                       </div>
-                      {job.completed_at && (
+
+                      <div style={styles.dateBlock}>
                         <div style={styles.dateLabelRow}>
-                          <span>✅ Completed:</span> {formatDate(job.completed_at)}
+                          <span>📅 Logged:</span> {formatDate(job.created_at)}
+                        </div>
+                        {job.completed_at && (
+                          <div style={styles.dateLabelRow}>
+                            <span>✅ Completed:</span> {formatDate(job.completed_at)}
+                          </div>
+                        )}
+                      </div>
+
+                      {job.status !== 'Delivered' && (
+                        <div style={styles.jobCardActions}>
+                          <button
+                            onClick={() => sendWhatsAppNotification(job)}
+                            style={styles.btnWhatsApp}
+                          >
+                            💬 Send WhatsApp Status Link
+                          </button>
                         </div>
                       )}
                     </div>
-
-                    {job.status !== 'Delivered' && (
-                      <div style={styles.jobCardActions}>
-                        <button
-                          onClick={() => sendWhatsAppNotification(job)}
-                          style={styles.btnWhatsApp}
-                        >
-                          💬 Send WhatsApp Status Link
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  )
+                })}
 
                 {/* LOAD MORE BUTTON FOR COMPLETED TAB */}
                 {activeTab === 'completed' && hasMoreCompleted && (
@@ -1725,7 +1738,7 @@ export default function App() {
       {editingJob && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
-            <h3 style={{ marginTop: 0 }}>Edit Job #{editingJob.id}</h3>
+            <h3 style={{ marginTop: 0 }}>Edit Job #{editingJob.job_number || editingJob.id}</h3>
             <form onSubmit={handleSaveEdit} style={styles.formGrid}>
               <label style={styles.label}>Customer Name</label>
               <input
