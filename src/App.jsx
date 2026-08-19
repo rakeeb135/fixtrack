@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 
 const MASTER_ADMIN_EMAIL = 'rakeebroomy@gmail.com'
-const YOUR_WHATSAPP_NUMBER = '94769944414'
+const YOUR_WHATSAPP_NUMBER = '94701833931'
 const COMPLETED_PAGE_SIZE = 50
 
 function generateTrackingToken() {
@@ -1724,7 +1724,7 @@ export default function App() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button onClick={sendRenewalWhatsApp} style={styles.btnWhatsApp}>
-                💬 Send Receipt on WhatsApp (0769944414)
+                💬 Send Receipt on WhatsApp (0701833931)
               </button>
               <button onClick={() => setShowPayModal(false)} style={styles.btnCancel}>
                 Close
