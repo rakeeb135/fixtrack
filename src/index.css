@@ -12,40 +12,52 @@ h2 {
   color: #0f172a !important;
 }
 
-/* --- UNIVERSAL POS THERMAL & RECEIPT PRINT MEDIA RULES --- */
 @media print {
-  /* 1. Hide everything on the webpage */
-  body * {
-    visibility: hidden !important;
-  }
-
-  /* 2. Make only the receipt wrapper and its children visible */
-  #receipt-modal-container,
-  #receipt-modal-container #receipt-print-area,
-  #receipt-modal-container #receipt-print-area * {
-    visibility: visible !important;
-  }
-
-  /* 3. Position the receipt flush at the top-left of the paper */
-  #receipt-modal-container {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 72mm !important;
-    max-width: 100% !important;
+  html, body {
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
-    color: #000000 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* 1. Completely collapse every element on the page */
+  body > * {
+    display: none !important;
+  }
+
+  /* 2. Un-collapse only the modal overlay and receipt content */
+  #receipt-modal-overlay,
+  #receipt-modal-overlay * {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  #receipt-modal-overlay {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  #receipt-modal-container {
     box-shadow: none !important;
     border: none !important;
+    max-width: 72mm !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   #receipt-print-area {
-    padding: 0 !important;
+    padding: 4mm 0 !important;
   }
 
-  /* 4. Hide screen buttons during actual print */
+  /* 3. Hide screen controls */
   .no-print {
     display: none !important;
   }

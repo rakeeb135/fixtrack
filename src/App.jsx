@@ -944,7 +944,7 @@ export default function App() {
 
     const nextLocalJobNumber = (count || 0) + 1
 
-    const { data, error } = await supabase.from('repairs').insert([
+    const { error } = await supabase.from('repairs').insert([
       {
         customer_name: customerName,
         phone_number: formattedPhone,
@@ -958,7 +958,7 @@ export default function App() {
         status: 'Received',
         user_id: session.user.id,
       },
-    ]).select()
+    ])
 
     if (error) {
       alert('Error saving job: ' + error.message)
@@ -971,9 +971,6 @@ export default function App() {
       setCost('')
       setWarranty('')
       fetchActiveRepairs()
-      if (data && data[0]) {
-        setReceiptJob(data[0])
-      }
     }
   }
 
@@ -1069,28 +1066,6 @@ export default function App() {
     }
 
     window.open(`https://wa.me/${job.phone_number}?text=${encodeURIComponent(message)}`, '_blank')
-  }
-
-  function sendDigitalReceiptWhatsApp(job) {
-    const lookupKey = job.tracking_token || job.id
-    const trackingLink = `${window.location.origin}?track=${lookupKey}`
-    const shopTitle = profile?.shop_name || 'FixTrack'
-    const displayNum = job.job_number || job.id
-
-    const receiptMessage = `🧾 *REPAIR RECEIPT - ${shopTitle.toUpperCase()}*\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📌 *Job No:* #${displayNum}\n` +
-      `👤 *Customer:* ${job.customer_name}\n` +
-      `📱 *Device:* ${job.device_model}\n` +
-      `🔧 *Fault:* ${job.issue || 'General Service'}\n` +
-      `💰 *Amount:* ${formatCostDisplay(job.cost)}\n` +
-      (job.warranty && job.warranty !== 'None' ? `🛡️ *Warranty:* ${job.warranty}\n` : '') +
-      `📅 *Date:* ${formatDateOnly(job.created_at)}\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `🔗 *Live Digital Receipt & Progress:*\n${trackingLink}\n\n` +
-      `_Thank you for choosing ${shopTitle}!_`
-
-    window.open(`https://wa.me/${job.phone_number}?text=${encodeURIComponent(receiptMessage)}`, '_blank')
   }
 
   const displayedJobs = (activeTab === 'active' ? activeRepairs : completedRepairs).filter(
@@ -1431,7 +1406,7 @@ export default function App() {
                 style={styles.input}
               />
               <button type="submit" style={styles.btnPrimary}>
-                Save Job & Show Receipt
+                Save Job
               </button>
             </form>
           </div>
@@ -1517,7 +1492,7 @@ export default function App() {
                                   }}
                                   style={styles.dropdownItem}
                                 >
-                                  🧾 View Receipt
+                                  🧾 View / Print Receipt
                                 </button>
                                 <button
                                   onClick={() => {
@@ -1577,22 +1552,16 @@ export default function App() {
                         )}
                       </div>
 
-                      <div style={styles.actionButtonsRow}>
-                        <button
-                          onClick={() => setReceiptJob(job)}
-                          style={styles.btnReceiptAction}
-                        >
-                          🧾 Receipt
-                        </button>
-                        {job.status !== 'Delivered' && (
+                      {job.status !== 'Delivered' && (
+                        <div style={styles.jobCardActions}>
                           <button
                             onClick={() => sendWhatsAppNotification(job)}
-                            style={styles.btnWhatsAppAction}
+                            style={styles.btnWhatsApp}
                           >
-                            💬 WhatsApp Status
+                            💬 Send WhatsApp Status Link
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -1620,9 +1589,9 @@ export default function App() {
         </footer>
       )}
 
-      {/* --- SMART RECEIPT MODAL --- */}
+      {/* --- CLEAN 1-PAGE SMART RECEIPT MODAL --- */}
       {receiptJob && (
-        <div style={styles.modalOverlay} onClick={() => setReceiptJob(null)}>
+        <div id="receipt-modal-overlay" style={styles.modalOverlay} onClick={() => setReceiptJob(null)}>
           <div
             id="receipt-modal-container"
             style={styles.receiptModalCard}
@@ -1678,7 +1647,7 @@ export default function App() {
                   </div>
                 )}
                 <div style={styles.receiptDividerSolid} />
-                <div style={{ ...styles.receiptRow, fontSize: '15px' }}>
+                <div style={{ ...styles.receiptRow, fontSize: '14px' }}>
                   <strong>Total Amount:</strong>
                   <strong>{formatCostDisplay(receiptJob.cost)}</strong>
                 </div>
@@ -1692,7 +1661,7 @@ export default function App() {
               <div style={styles.receiptQrSection}>
                 <QRCodeSVG
                   value={`${window.location.origin}?track=${receiptJob.tracking_token || receiptJob.id}`}
-                  size={100}
+                  size={90}
                   level="M"
                 />
                 <p style={styles.receiptQrLabel}>
@@ -1716,13 +1685,7 @@ export default function App() {
                 onClick={() => window.print()}
                 style={styles.btnPrintReceipt}
               >
-                🖨️ Print / Save PDF
-              </button>
-              <button
-                onClick={() => sendDigitalReceiptWhatsApp(receiptJob)}
-                style={styles.btnWhatsAppReceipt}
-              >
-                💬 Send Digital Bill
+                🖨️ Print Slip / Save PDF
               </button>
               <button
                 onClick={() => setReceiptJob(null)}
@@ -2356,34 +2319,6 @@ const styles = {
     backgroundColor: '#ffffff',
     boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
   },
-  actionButtonsRow: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 2fr',
-    gap: '8px',
-    borderTop: '1px solid #f1f5f9',
-    paddingTop: '10px',
-    marginTop: '6px',
-  },
-  btnReceiptAction: {
-    backgroundColor: '#f8fafc',
-    color: '#0f172a',
-    border: '1px solid #cbd5e1',
-    padding: '9px',
-    borderRadius: '8px',
-    fontWeight: 'bold',
-    fontSize: '12px',
-    cursor: 'pointer',
-  },
-  btnWhatsAppAction: {
-    backgroundColor: '#22c55e',
-    color: '#fff',
-    border: 'none',
-    padding: '9px',
-    borderRadius: '8px',
-    fontWeight: 'bold',
-    fontSize: '12px',
-    cursor: 'pointer',
-  },
   btnLoadMore: {
     backgroundColor: '#ffffff',
     color: '#2563eb',
@@ -2483,7 +2418,7 @@ const styles = {
     borderRadius: '8px',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     zIndex: 10,
-    minWidth: '140px',
+    minWidth: '170px',
     overflow: 'hidden',
   },
   dropdownItem: {
@@ -2517,6 +2452,10 @@ const styles = {
   dateLabelRow: {
     fontSize: '11px',
     color: '#64748b',
+  },
+  jobCardActions: {
+    borderTop: '1px solid #f1f5f9',
+    paddingTop: '10px',
   },
   btnWhatsApp: {
     backgroundColor: '#22c55e',
@@ -2675,56 +2614,56 @@ const styles = {
     boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
   },
 
-  // --- SMART RECEIPT STYLES ---
+  // --- CLEAN SMART RECEIPT STYLES ---
   receiptModalCard: {
     backgroundColor: '#ffffff',
     borderRadius: '12px',
     width: '100%',
-    maxWidth: '360px',
+    maxWidth: '350px',
     boxShadow: '0 12px 30px rgba(0,0,0,0.25)',
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
   },
   receiptPrintWrapper: {
-    padding: '20px 18px',
+    padding: '18px 16px',
     backgroundColor: '#ffffff',
     color: '#000000',
     fontFamily: '"Courier New", Courier, monospace',
   },
   receiptHeader: {
     textAlign: 'center',
-    marginBottom: '10px',
+    marginBottom: '8px',
   },
   receiptShopName: {
     margin: '0 0 2px 0',
-    fontSize: '18px',
+    fontSize: '17px',
     fontWeight: 'bold',
     textTransform: 'uppercase',
   },
   receiptSubtext: {
     margin: 0,
-    fontSize: '11px',
+    fontSize: '10px',
     color: '#555555',
   },
   receiptDividerDashed: {
     borderTop: '1px dashed #000000',
-    margin: '10px 0',
+    margin: '8px 0',
   },
   receiptDividerSolid: {
     borderTop: '1px solid #000000',
-    margin: '8px 0',
+    margin: '6px 0',
   },
   receiptTypeTitle: {
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: 'bold',
     letterSpacing: '1px',
   },
   receiptDataGrid: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px',
-    fontSize: '12px',
+    gap: '3px',
+    fontSize: '11px',
   },
   receiptRow: {
     display: 'flex',
@@ -2736,55 +2675,44 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: '14px',
-    padding: '10px 0',
+    marginTop: '10px',
+    padding: '8px 0',
     borderTop: '1px dashed #000000',
     borderBottom: '1px dashed #000000',
   },
   receiptQrLabel: {
-    fontSize: '10px',
+    fontSize: '9px',
     textAlign: 'center',
-    margin: '6px 0 0 0',
+    margin: '4px 0 0 0',
     maxWidth: '200px',
     fontWeight: 'bold',
   },
   receiptFooter: {
     textAlign: 'center',
-    marginTop: '10px',
+    marginTop: '8px',
   },
   receiptTerms: {
-    fontSize: '9px',
-    margin: '0 0 4px 0',
+    fontSize: '8px',
+    margin: '0 0 3px 0',
     color: '#444444',
     lineHeight: '1.2',
   },
   receiptPowered: {
-    fontSize: '9px',
+    fontSize: '8px',
     fontWeight: 'bold',
     letterSpacing: '0.5px',
     margin: 0,
   },
   receiptActionToolbar: {
-    padding: '12px 16px',
+    padding: '10px 14px',
     backgroundColor: '#f8fafc',
     borderTop: '1px solid #e2e8f0',
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: '6px',
   },
   btnPrintReceipt: {
     backgroundColor: '#0f172a',
-    color: '#ffffff',
-    border: 'none',
-    padding: '10px',
-    borderRadius: '8px',
-    fontWeight: 'bold',
-    fontSize: '13px',
-    cursor: 'pointer',
-    width: '100%',
-  },
-  btnWhatsAppReceipt: {
-    backgroundColor: '#22c55e',
     color: '#ffffff',
     border: 'none',
     padding: '10px',
