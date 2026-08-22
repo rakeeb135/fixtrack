@@ -12,53 +12,18 @@ h2 {
   color: #0f172a !important;
 }
 
-@media print {
-  html, body {
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-    height: auto !important;
-    overflow: visible !important;
-  }
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light;
+  color: #0f172a;
+  background-color: #f1f5f9;
+}
 
-  /* 1. Completely collapse every element on the page */
-  body > * {
-    display: none !important;
-  }
-
-  /* 2. Un-collapse only the modal overlay and receipt content */
-  #receipt-modal-overlay,
-  #receipt-modal-overlay * {
-    display: block !important;
-    visibility: visible !important;
-  }
-
-  #receipt-modal-overlay {
-    position: static !important;
-    background: transparent !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-  }
-
-  #receipt-modal-container {
-    box-shadow: none !important;
-    border: none !important;
-    max-width: 72mm !important;
-    width: 100% !important;
-    margin: 0 auto !important;
-    padding: 0 !important;
-    page-break-after: avoid !important;
-    page-break-inside: avoid !important;
-  }
-
-  #receipt-print-area {
-    padding: 4mm 0 !important;
-  }
-
-  /* 3. Hide screen controls */
-  .no-print {
-    display: none !important;
-  }
+body {
+  margin: 0;
+  display: block;
+  min-width: 320px;
+  min-height: 100vh;
 }

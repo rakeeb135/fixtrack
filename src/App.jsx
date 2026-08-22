@@ -597,6 +597,66 @@ export default function App() {
     window.open(`https://wa.me/${YOUR_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
+  // --- BULLETPROOF ISOLATED RECEIPT PRINTING ENGINE ---
+  function printReceiptDirect() {
+    const printArea = document.getElementById('receipt-print-area')
+    if (!printArea) return
+
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    document.body.appendChild(iframe)
+
+    const doc = iframe.contentWindow.document
+    doc.open()
+    doc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Receipt</title>
+          <style>
+            @page {
+              margin: 0;
+              size: auto;
+            }
+            body {
+              margin: 0;
+              padding: 10px;
+              background: #fff;
+              color: #000;
+              font-family: "Courier New", Courier, monospace;
+              display: flex;
+              justify-content: center;
+            }
+            .receipt-wrap {
+              width: 100%;
+              max-width: 72mm;
+              box-sizing: border-box;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="receipt-wrap">
+            ${printArea.innerHTML}
+          </div>
+        </body>
+      </html>
+    `)
+    doc.close()
+
+    setTimeout(() => {
+      iframe.contentWindow.focus()
+      iframe.contentWindow.print()
+      setTimeout(() => {
+        document.body.removeChild(iframe)
+      }, 1000)
+    }, 250)
+  }
+
   // --- PUBLIC TRACKING VIEW ---
   if (trackingLookup) {
     const statusOrder = { 'Received': 1, 'In Progress': 2, 'Ready': 3, 'Delivered': 4 }
@@ -1591,9 +1651,8 @@ export default function App() {
 
       {/* --- CLEAN 1-PAGE SMART RECEIPT MODAL --- */}
       {receiptJob && (
-        <div id="receipt-modal-overlay" style={styles.modalOverlay} onClick={() => setReceiptJob(null)}>
+        <div style={styles.modalOverlay} onClick={() => setReceiptJob(null)}>
           <div
-            id="receipt-modal-container"
             style={styles.receiptModalCard}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1680,9 +1739,9 @@ export default function App() {
             </div>
 
             {/* SCREEN-ONLY ACTION TOOLBAR */}
-            <div className="no-print" style={styles.receiptActionToolbar}>
+            <div style={styles.receiptActionToolbar}>
               <button
-                onClick={() => window.print()}
+                onClick={printReceiptDirect}
                 style={styles.btnPrintReceipt}
               >
                 🖨️ Print Slip / Save PDF
