@@ -597,64 +597,65 @@ export default function App() {
     window.open(`https://wa.me/${YOUR_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
-  // --- BULLETPROOF ISOLATED RECEIPT PRINTING ENGINE ---
-  function printReceiptDirect() {
+  // --- GUARANTEED 1-PAGE CROSS-DEVICE PRINT ENGINE ---
+  function printReceiptStrictSinglePage() {
     const printArea = document.getElementById('receipt-print-area')
     if (!printArea) return
 
-    const iframe = document.createElement('iframe')
-    iframe.style.position = 'fixed'
-    iframe.style.right = '0'
-    iframe.style.bottom = '0'
-    iframe.style.width = '0'
-    iframe.style.height = '0'
-    iframe.style.border = '0'
-    document.body.appendChild(iframe)
+    const printWin = window.open('', '_blank', 'width=400,height=600')
+    if (!printWin) {
+      window.print()
+      return
+    }
 
-    const doc = iframe.contentWindow.document
-    doc.open()
-    doc.write(`
+    printWin.document.open()
+    printWin.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
           <title>Receipt</title>
           <style>
             @page {
-              margin: 0;
               size: auto;
+              margin: 0mm;
             }
-            body {
+            html, body {
               margin: 0;
-              padding: 10px;
-              background: #fff;
-              color: #000;
+              padding: 0;
+              background: #ffffff;
+              color: #000000;
+              height: auto;
+              max-height: 100%;
+              overflow: hidden;
               font-family: "Courier New", Courier, monospace;
-              display: flex;
-              justify-content: center;
             }
-            .receipt-wrap {
+            .print-wrapper {
               width: 100%;
-              max-width: 72mm;
+              max-width: 68mm;
+              margin: 0 auto;
+              padding: 6mm 4mm 4mm 4mm;
               box-sizing: border-box;
+              page-break-inside: avoid;
+              page-break-after: avoid;
+              page-break-before: avoid;
             }
           </style>
         </head>
         <body>
-          <div class="receipt-wrap">
+          <div class="print-wrapper">
             ${printArea.innerHTML}
           </div>
+          <script>
+            window.onload = function() {
+              window.focus();
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
         </body>
       </html>
     `)
-    doc.close()
-
-    setTimeout(() => {
-      iframe.contentWindow.focus()
-      iframe.contentWindow.print()
-      setTimeout(() => {
-        document.body.removeChild(iframe)
-      }, 1000)
-    }, 250)
+    printWin.document.close()
   }
 
   // --- PUBLIC TRACKING VIEW ---
@@ -1649,7 +1650,7 @@ export default function App() {
         </footer>
       )}
 
-      {/* --- CLEAN 1-PAGE SMART RECEIPT MODAL --- */}
+      {/* --- STRICT 1-PAGE SMART RECEIPT MODAL --- */}
       {receiptJob && (
         <div style={styles.modalOverlay} onClick={() => setReceiptJob(null)}>
           <div
@@ -1706,7 +1707,7 @@ export default function App() {
                   </div>
                 )}
                 <div style={styles.receiptDividerSolid} />
-                <div style={{ ...styles.receiptRow, fontSize: '14px' }}>
+                <div style={{ ...styles.receiptRow, fontSize: '13px' }}>
                   <strong>Total Amount:</strong>
                   <strong>{formatCostDisplay(receiptJob.cost)}</strong>
                 </div>
@@ -1720,7 +1721,7 @@ export default function App() {
               <div style={styles.receiptQrSection}>
                 <QRCodeSVG
                   value={`${window.location.origin}?track=${receiptJob.tracking_token || receiptJob.id}`}
-                  size={90}
+                  size={85}
                   level="M"
                 />
                 <p style={styles.receiptQrLabel}>
@@ -1741,7 +1742,7 @@ export default function App() {
             {/* SCREEN-ONLY ACTION TOOLBAR */}
             <div style={styles.receiptActionToolbar}>
               <button
-                onClick={printReceiptDirect}
+                onClick={printReceiptStrictSinglePage}
                 style={styles.btnPrintReceipt}
               >
                 🖨️ Print Slip / Save PDF
@@ -2673,30 +2674,31 @@ const styles = {
     boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
   },
 
-  // --- CLEAN SMART RECEIPT STYLES ---
+  // --- STRICT 1-PAGE SMART RECEIPT STYLES ---
   receiptModalCard: {
     backgroundColor: '#ffffff',
     borderRadius: '12px',
     width: '100%',
-    maxWidth: '350px',
+    maxWidth: '340px',
     boxShadow: '0 12px 30px rgba(0,0,0,0.25)',
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
   },
   receiptPrintWrapper: {
-    padding: '18px 16px',
+    padding: '16px 14px',
     backgroundColor: '#ffffff',
     color: '#000000',
     fontFamily: '"Courier New", Courier, monospace',
+    boxSizing: 'border-box',
   },
   receiptHeader: {
     textAlign: 'center',
-    marginBottom: '8px',
+    marginBottom: '6px',
   },
   receiptShopName: {
     margin: '0 0 2px 0',
-    fontSize: '17px',
+    fontSize: '16px',
     fontWeight: 'bold',
     textTransform: 'uppercase',
   },
@@ -2707,21 +2709,21 @@ const styles = {
   },
   receiptDividerDashed: {
     borderTop: '1px dashed #000000',
-    margin: '8px 0',
+    margin: '6px 0',
   },
   receiptDividerSolid: {
     borderTop: '1px solid #000000',
-    margin: '6px 0',
+    margin: '5px 0',
   },
   receiptTypeTitle: {
     fontSize: '11px',
     fontWeight: 'bold',
-    letterSpacing: '1px',
+    letterSpacing: '0.5px',
   },
   receiptDataGrid: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '3px',
+    gap: '2px',
     fontSize: '11px',
   },
   receiptRow: {
@@ -2734,8 +2736,8 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: '10px',
-    padding: '8px 0',
+    marginTop: '8px',
+    padding: '6px 0',
     borderTop: '1px dashed #000000',
     borderBottom: '1px dashed #000000',
   },
@@ -2748,11 +2750,11 @@ const styles = {
   },
   receiptFooter: {
     textAlign: 'center',
-    marginTop: '8px',
+    marginTop: '6px',
   },
   receiptTerms: {
     fontSize: '8px',
-    margin: '0 0 3px 0',
+    margin: '0 0 2px 0',
     color: '#444444',
     lineHeight: '1.2',
   },
