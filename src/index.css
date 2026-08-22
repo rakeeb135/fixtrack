@@ -11,3 +11,42 @@ body {
 h2 {
   color: #0f172a !important;
 }
+
+/* --- UNIVERSAL POS THERMAL & RECEIPT PRINT MEDIA RULES --- */
+@media print {
+  /* 1. Hide everything on the webpage */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* 2. Make only the receipt wrapper and its children visible */
+  #receipt-modal-container,
+  #receipt-modal-container #receipt-print-area,
+  #receipt-modal-container #receipt-print-area * {
+    visibility: visible !important;
+  }
+
+  /* 3. Position the receipt flush at the top-left of the paper */
+  #receipt-modal-container {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 72mm !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  #receipt-print-area {
+    padding: 0 !important;
+  }
+
+  /* 4. Hide screen buttons during actual print */
+  .no-print {
+    display: none !important;
+  }
+}
