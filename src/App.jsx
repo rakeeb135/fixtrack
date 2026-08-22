@@ -597,65 +597,8 @@ export default function App() {
     window.open(`https://wa.me/${YOUR_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
-  // --- GUARANTEED 1-PAGE CROSS-DEVICE PRINT ENGINE ---
-  function printReceiptStrictSinglePage() {
-    const printArea = document.getElementById('receipt-print-area')
-    if (!printArea) return
-
-    const printWin = window.open('', '_blank', 'width=400,height=600')
-    if (!printWin) {
-      window.print()
-      return
-    }
-
-    printWin.document.open()
-    printWin.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Receipt</title>
-          <style>
-            @page {
-              size: auto;
-              margin: 0mm;
-            }
-            html, body {
-              margin: 0;
-              padding: 0;
-              background: #ffffff;
-              color: #000000;
-              height: auto;
-              max-height: 100%;
-              overflow: hidden;
-              font-family: "Courier New", Courier, monospace;
-            }
-            .print-wrapper {
-              width: 100%;
-              max-width: 68mm;
-              margin: 0 auto;
-              padding: 6mm 4mm 4mm 4mm;
-              box-sizing: border-box;
-              page-break-inside: avoid;
-              page-break-after: avoid;
-              page-break-before: avoid;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="print-wrapper">
-            ${printArea.innerHTML}
-          </div>
-          <script>
-            window.onload = function() {
-              window.focus();
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
-        </body>
-      </html>
-    `)
-    printWin.document.close()
+  function triggerInPlacePrint() {
+    window.print()
   }
 
   // --- PUBLIC TRACKING VIEW ---
@@ -1149,930 +1092,1017 @@ export default function App() {
     : 'FixTrack'
 
   return (
-    <div style={styles.container} onClick={() => setActiveMenuId(null)}>
-      {/* HEADER */}
-      <header style={styles.header}>
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <h1 style={{ margin: 0, fontSize: '20px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-            {profile?.role === 'admin' ? 'FixTrack' : currentShopBrandTitle}
-          </h1>
-          <p style={{ margin: '2px 0 0 0', opacity: 0.85, fontSize: '12px' }}>
-            {session.user.email} {profile?.role === 'admin' && '👑 (Master Admin)'}
-          </p>
-        </div>
-        <button onClick={handleLogout} style={styles.btnLogout}>
-          Sign Out
-        </button>
-      </header>
-
-      {/* WARNING BANNER */}
-      {isNearExpiry && (
-        <div style={styles.warningBannerCard}>
-          <div>
-            <strong style={{ fontSize: '14px', display: 'block', color: '#854d0e', marginBottom: '2px' }}>
-              ⏳ Plan Expires in {daysLeft} Day{daysLeft > 1 ? 's' : ''} ({formatDateOnly(profile?.expiry_date)})
-            </strong>
-            <span style={{ fontSize: '12px', color: '#a16207' }}>
-              Renewal Rate: <strong>LKR {profile?.monthly_rate || 2000} / month</strong>
-            </span>
+    <>
+      {/* MAIN APPLICATION CONTAINER (Hidden completely during native print) */}
+      <div style={styles.container} onClick={() => setActiveMenuId(null)}>
+        {/* HEADER */}
+        <header style={styles.header}>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <h1 style={{ margin: 0, fontSize: '20px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+              {profile?.role === 'admin' ? 'FixTrack' : currentShopBrandTitle}
+            </h1>
+            <p style={{ margin: '2px 0 0 0', opacity: 0.85, fontSize: '12px' }}>
+              {session.user.email} {profile?.role === 'admin' && '👑 (Master Admin)'}
+            </p>
           </div>
-          <button onClick={() => setShowPayModal(true)} style={styles.btnBannerPay}>
-            💳 View Renewal Details
+          <button onClick={handleLogout} style={styles.btnLogout}>
+            Sign Out
           </button>
-        </div>
-      )}
+        </header>
 
-      {/* MASTER ADMIN DASHBOARD */}
-      {profile?.role === 'admin' ? (
-        <div>
-          {/* ONBOARD SHOP */}
-          <div style={styles.card}>
-            <h2 style={styles.cardTitle}>➕ Onboard New Shopkeeper</h2>
-            <form onSubmit={handleCreateShopAccount} style={styles.formGrid}>
-              <input
-                type="text"
-                placeholder="Shop Brand Name (e.g. Kandy Mobile Care)"
-                value={newShopName}
-                onChange={(e) => setNewShopName(e.target.value)}
-                style={styles.input}
-              />
-              <input
-                type="email"
-                placeholder="Shop Login Email (e.g. kandymobiles@shop.com) *"
-                value={newShopEmail}
-                onChange={(e) => setNewShopEmail(e.target.value)}
-                style={styles.input}
-                required
-              />
-              <input
-                type="text"
-                placeholder="Initial Password *"
-                value={newShopPassword}
-                onChange={(e) => setNewShopPassword(e.target.value)}
-                style={styles.input}
-                required
-              />
-              <input
-                type="tel"
-                placeholder="Shopkeeper WhatsApp Phone (e.g. 0771234567)"
-                value={newShopPhone}
-                onChange={(e) => setNewShopPhone(e.target.value)}
-                style={styles.input}
-              />
-              <div style={{ display: 'flex', gap: '10px' }}>
+        {/* WARNING BANNER */}
+        {isNearExpiry && (
+          <div style={styles.warningBannerCard}>
+            <div>
+              <strong style={{ fontSize: '14px', display: 'block', color: '#854d0e', marginBottom: '2px' }}>
+                ⏳ Plan Expires in {daysLeft} Day{daysLeft > 1 ? 's' : ''} ({formatDateOnly(profile?.expiry_date)})
+              </strong>
+              <span style={{ fontSize: '12px', color: '#a16207' }}>
+                Renewal Rate: <strong>LKR {profile?.monthly_rate || 2000} / month</strong>
+              </span>
+            </div>
+            <button onClick={() => setShowPayModal(true)} style={styles.btnBannerPay}>
+              💳 View Renewal Details
+            </button>
+          </div>
+        )}
+
+        {/* MASTER ADMIN DASHBOARD */}
+        {profile?.role === 'admin' ? (
+          <div>
+            {/* ONBOARD SHOP */}
+            <div style={styles.card}>
+              <h2 style={styles.cardTitle}>➕ Onboard New Shopkeeper</h2>
+              <form onSubmit={handleCreateShopAccount} style={styles.formGrid}>
                 <input
                   type="text"
-                  placeholder="Monthly Rate (LKR)"
-                  value={newShopRate}
-                  onChange={(e) => setNewShopRate(e.target.value)}
+                  placeholder="Shop Brand Name (e.g. Kandy Mobile Care)"
+                  value={newShopName}
+                  onChange={(e) => setNewShopName(e.target.value)}
                   style={styles.input}
                 />
-                <select
-                  value={newShopPlan}
-                  onChange={(e) => setNewShopPlan(e.target.value)}
+                <input
+                  type="email"
+                  placeholder="Shop Login Email (e.g. kandymobiles@shop.com) *"
+                  value={newShopEmail}
+                  onChange={(e) => setNewShopEmail(e.target.value)}
                   style={styles.input}
-                >
-                  <option value="trial">14-Day Free Trial</option>
-                  <option value="active">Active (30 Days)</option>
-                </select>
-              </div>
-              <button type="submit" style={styles.btnPrimary}>
-                Create Shop Account
-              </button>
-            </form>
-
-            {lastOnboardedShop && lastOnboardedShop.phone && (
-              <div style={{ marginTop: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-                <button onClick={sendShopWelcomeWhatsApp} style={styles.btnWhatsApp}>
-                  💬 Send Welcome WhatsApp to {lastOnboardedShop.email}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* ALL CLIENT SHOPS */}
-          <div style={styles.card}>
-            <h2 style={styles.cardTitle}>📊 Client Shops ({allProfiles.length})</h2>
-            <div style={styles.jobList}>
-              {allProfiles.map((p) => {
-                const pDiff = Math.ceil((new Date(p.expiry_date) - new Date()) / (1000 * 60 * 60 * 24))
-                const pExpired = p.status === 'suspended' || pDiff <= 0
-
-                return (
-                  <div key={p.id} style={styles.adminShopCard}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <strong style={{ fontSize: '15px' }}>{p.shop_name || 'FixTrack'}</strong>
-                        <div style={{ fontSize: '12px', color: '#475569' }}>{p.email}</div>
-                        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                          Rate: <strong>LKR {p.monthly_rate || 2000}</strong> / mo
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>
-                          Expires: <strong>{formatDate(p.expiry_date)}</strong> ({pDiff} days left)
-                        </div>
-                      </div>
-                      <span
-                        style={{
-                          backgroundColor: p.role === 'admin' ? '#dbeafe' : pExpired ? '#fecdd3' : '#bbf7d0',
-                          color: p.role === 'admin' ? '#1e40af' : pExpired ? '#9f1239' : '#166534',
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          fontWeight: 'bold',
-                        }}
-                      >
-                        {p.role === 'admin' ? '👑 Admin' : pExpired ? '🔴 Paused' : '🟢 Active'}
-                      </span>
-                    </div>
-
-                    {p.role !== 'admin' && (
-                      <div style={styles.adminActionsRow}>
-                        <button onClick={() => extendSubscription(p, 1)} style={styles.btnQuickAdd}>
-                          +1 Mo
-                        </button>
-                        <button onClick={() => extendSubscription(p, 6)} style={styles.btnQuickAdd}>
-                          +6 Mo
-                        </button>
-                        <button onClick={() => extendSubscription(p, 12)} style={styles.btnQuickAdd}>
-                          +1 Yr
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingDateProfile(p)
-                            const currentIso = p.expiry_date ? new Date(p.expiry_date).toISOString().slice(0, 10) : ''
-                            setCustomDateInput(currentIso)
-                          }}
-                          style={styles.btnQuickAdd}
-                        >
-                          📅 Set Date
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingRateProfile(p)
-                            setCustomRateInput(p.monthly_rate ? p.monthly_rate.toString() : '2000')
-                          }}
-                          style={styles.btnEditRate}
-                        >
-                          ✏️ Rate
-                        </button>
-                        <button onClick={() => toggleShopStatus(p)} style={styles.btnToggleStatus}>
-                          {p.status === 'suspended' ? '▶️ Resume' : '⏸️ Pause'}
-                        </button>
-                        <button onClick={() => deleteShopAccount(p)} style={styles.btnDeleteShop}>
-                          🗑️
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* REGULAR SHOPKEEPER DASHBOARD */
-        <div>
-          {/* STATS BAR */}
-          <div style={styles.statsBarGrid}>
-            <div style={styles.statCard}>
-              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>IN SHOP</span>
-              <strong style={{ fontSize: '18px', color: '#2563eb' }}>{activeRepairs.length} Jobs</strong>
-            </div>
-            <div style={styles.statCard}>
-              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>DELIVERED (MO)</span>
-              <strong style={{ fontSize: '18px', color: '#10b981' }}>{monthlyDeliveredCount} Jobs</strong>
-            </div>
-            <div
-              style={{ ...styles.statCard, cursor: 'pointer' }}
-              onClick={() => setShowRevenueHistoryModal(true)}
-              title="Click to view revenue history for previous months"
-            >
-              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>THIS MONTH</span>
-              <strong style={{ fontSize: '16px', color: '#059669' }}>LKR {monthlyRevenue.toLocaleString()}</strong>
-            </div>
-          </div>
-
-          {/* TOOLBAR */}
-          <div style={styles.toolbarGrid}>
-            <button onClick={() => setShowSettingsModal(true)} style={styles.btnToolSecondary}>
-              ⚙️ Shop Settings
-            </button>
-            <button onClick={exportToCSV} style={styles.btnToolPrimary} disabled={exportingCSV}>
-              {exportingCSV ? '⏳ Exporting...' : '📥 Export (CSV)'}
-            </button>
-          </div>
-
-          <div style={styles.card}>
-            <h2 style={styles.cardTitle}>Log New Repair Job</h2>
-            <form onSubmit={handleAddRepair} style={styles.formGrid}>
-              <input
-                type="text"
-                placeholder="Customer Name *"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                style={styles.input}
-              />
-              <input
-                type="tel"
-                inputMode="tel"
-                placeholder="WhatsApp Phone (e.g. 0771234567) *"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                style={styles.input}
-              />
-              <input
-                type="text"
-                placeholder="Device Model (e.g. iPhone 11) *"
-                value={deviceModel}
-                onChange={(e) => setDeviceModel(e.target.value)}
-                style={styles.input}
-              />
-
-              <div>
-                <div style={{ position: 'relative' }}>
+                  required
+                />
+                <input
+                  type="text"
+                  placeholder="Initial Password *"
+                  value={newShopPassword}
+                  onChange={(e) => setNewShopPassword(e.target.value)}
+                  style={styles.input}
+                  required
+                />
+                <input
+                  type="tel"
+                  placeholder="Shopkeeper WhatsApp Phone (e.g. 0771234567)"
+                  value={newShopPhone}
+                  onChange={(e) => setNewShopPhone(e.target.value)}
+                  style={styles.input}
+                />
+                <div style={{ display: 'flex', gap: '10px' }}>
                   <input
                     type="text"
-                    placeholder="Issue / Fault (e.g. Display Replacement)"
-                    value={issue}
-                    onChange={(e) => setIssue(e.target.value)}
-                    style={{ ...styles.input, paddingRight: '30px' }}
+                    placeholder="Monthly Rate (LKR)"
+                    value={newShopRate}
+                    onChange={(e) => setNewShopRate(e.target.value)}
+                    style={styles.input}
                   />
-                  {issue && (
-                    <button
-                      type="button"
-                      onClick={() => setIssue('')}
-                      style={styles.btnClearInput}
-                      title="Clear field"
-                    >
-                      ✕
-                    </button>
-                  )}
+                  <select
+                    value={newShopPlan}
+                    onChange={(e) => setNewShopPlan(e.target.value)}
+                    style={styles.input}
+                  >
+                    <option value="trial">14-Day Free Trial</option>
+                    <option value="active">Active (30 Days)</option>
+                  </select>
                 </div>
+                <button type="submit" style={styles.btnPrimary}>
+                  Create Shop Account
+                </button>
+              </form>
 
-                <div style={styles.presetContainer}>
-                  {DEFAULT_FAULTS.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => appendFaultTag(tag)}
-                      style={styles.presetChip}
-                    >
-                      {tag}
-                    </button>
-                  ))}
+              {lastOnboardedShop && lastOnboardedShop.phone && (
+                <div style={{ marginTop: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                  <button onClick={sendShopWelcomeWhatsApp} style={styles.btnWhatsApp}>
+                    💬 Send Welcome WhatsApp to {lastOnboardedShop.email}
+                  </button>
                 </div>
-              </div>
-
-              <div>
-                <input
-                  type="text"
-                  placeholder="Warranty (Optional - e.g. 1 Month, 7 Days)"
-                  value={warranty}
-                  onChange={(e) => setWarranty(e.target.value)}
-                  style={styles.input}
-                />
-                <div style={styles.presetContainer}>
-                  {WARRANTY_PRESETS.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => setWarranty(tag === 'None' ? '' : tag)}
-                      style={{
-                        ...styles.presetChip,
-                        backgroundColor: (warranty === tag || (tag === 'None' && !warranty)) ? '#dbeafe' : '#f1f5f9',
-                        borderColor: (warranty === tag || (tag === 'None' && !warranty)) ? '#3b82f6' : '#cbd5e1',
-                        color: (warranty === tag || (tag === 'None' && !warranty)) ? '#1d4ed8' : '#334155',
-                      }}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <input
-                type="text"
-                placeholder="Internal Notes (e.g. Password: 1234)"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                style={styles.input}
-              />
-
-              <input
-                type="number"
-                inputMode="numeric"
-                placeholder="Cost LKR (Leave blank if pending estimate)"
-                value={cost}
-                onChange={(e) => setCost(e.target.value)}
-                style={styles.input}
-              />
-              <button type="submit" style={styles.btnPrimary}>
-                Save Job
-              </button>
-            </form>
-          </div>
-
-          <div style={styles.card}>
-            <div style={styles.tabBar}>
-              <button
-                onClick={() => setActiveTab('active')}
-                style={activeTab === 'active' ? styles.tabActiveBlue : styles.tabInactive}
-              >
-                Active Repairs ({activeRepairs.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('completed')}
-                style={activeTab === 'completed' ? styles.tabActiveGreen : styles.tabInactive}
-              >
-                Completed ({completedRepairs.length}{hasMoreCompleted ? '+' : ''})
-              </button>
+              )}
             </div>
 
-            <input
-              type="text"
-              placeholder="🔍 Search customer, device, phone, notes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={styles.searchInput}
-            />
-
-            {loading ? (
-              <p style={{ textAlign: 'center', padding: '20px' }}>Loading database...</p>
-            ) : displayedJobs.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#64748b', padding: '20px' }}>
-                {activeTab === 'active'
-                  ? 'No active repair jobs right now.'
-                  : 'No completed repairs found.'}
-              </p>
-            ) : (
+            {/* ALL CLIENT SHOPS */}
+            <div style={styles.card}>
+              <h2 style={styles.cardTitle}>📊 Client Shops ({allProfiles.length})</h2>
               <div style={styles.jobList}>
-                {displayedJobs.map((job) => {
-                  const displayJobNumber = job.job_number || job.id
+                {allProfiles.map((p) => {
+                  const pDiff = Math.ceil((new Date(p.expiry_date) - new Date()) / (1000 * 60 * 60 * 24))
+                  const pExpired = p.status === 'suspended' || pDiff <= 0
+
                   return (
-                    <div key={job.id} style={styles.jobCard}>
-                      <div style={styles.jobCardHeader}>
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                          <span style={styles.jobId}>#{displayJobNumber}</span>
-                          <strong style={{ fontSize: '16px', marginLeft: '8px' }}>
-                            {job.customer_name}
-                          </strong>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <select
-                            value={job.status}
-                            onChange={(e) => updateStatus(job.id, e.target.value, job)}
-                            style={{
-                              ...getStatusStyle(job.status),
-                              paddingRight: '22px',
-                            }}
-                          >
-                            <option value="Received">Received</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Ready">Ready</option>
-                            <option value="Delivered">Delivered</option>
-                          </select>
-
-                          <div style={{ position: 'relative' }}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setActiveMenuId(activeMenuId === job.id ? null : job.id)
-                              }}
-                              style={styles.btnMenuDots}
-                            >
-                              ⋮
-                            </button>
-
-                            {activeMenuId === job.id && (
-                              <div style={styles.dropdownMenu}>
-                                <button
-                                  onClick={() => {
-                                    setReceiptJob(job)
-                                    setActiveMenuId(null)
-                                  }}
-                                  style={styles.dropdownItem}
-                                >
-                                  🧾 View / Print Receipt
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setEditingJob(job)
-                                    setActiveMenuId(null)
-                                  }}
-                                  style={styles.dropdownItem}
-                                >
-                                  ✏️ Edit Details
-                                </button>
-                                <button
-                                  onClick={() => deleteRepair(job.id)}
-                                  style={{ ...styles.dropdownItem, color: '#ef4444' }}
-                                >
-                                  🗑️ Delete Job
-                                </button>
-                              </div>
-                            )}
+                    <div key={p.id} style={styles.adminShopCard}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <strong style={{ fontSize: '15px' }}>{p.shop_name || 'FixTrack'}</strong>
+                          <div style={{ fontSize: '12px', color: '#475569' }}>{p.email}</div>
+                          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                            Rate: <strong>LKR {p.monthly_rate || 2000}</strong> / mo
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748b' }}>
+                            Expires: <strong>{formatDate(p.expiry_date)}</strong> ({pDiff} days left)
                           </div>
                         </div>
+                        <span
+                          style={{
+                            backgroundColor: p.role === 'admin' ? '#dbeafe' : pExpired ? '#fecdd3' : '#bbf7d0',
+                            color: p.role === 'admin' ? '#1e40af' : pExpired ? '#9f1239' : '#166534',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          {p.role === 'admin' ? '👑 Admin' : pExpired ? '🔴 Paused' : '🟢 Active'}
+                        </span>
                       </div>
 
-                      <div style={styles.jobCardBodyStack}>
-                        <p style={styles.jobText}>
-                          <span>📱 Device:</span> <strong>{job.device_model}</strong>
-                        </p>
-                        <p style={styles.jobText}>
-                          <span>🔧 Fault:</span> <strong>{job.issue || '-'}</strong>
-                        </p>
-                        {job.warranty && job.warranty !== 'None' && (
-                          <p style={styles.jobText}>
-                            <span>🛡️ Warranty:</span> <strong>{job.warranty}</strong>
-                          </p>
-                        )}
-                        {job.notes && (
-                          <p style={{ ...styles.jobText, color: '#64748b' }}>
-                            <span>📝 Notes:</span> <em>{job.notes}</em>
-                          </p>
-                        )}
-                        <p style={styles.jobText}>
-                          <span>📞 Phone:</span>{' '}
-                          <strong>{formatDisplayPhone(job.phone_number)}</strong>
-                        </p>
-                        <p style={styles.jobText}>
-                          <span>💰 Cost:</span> <strong>{formatCostDisplay(job.cost)}</strong>
-                        </p>
-                      </div>
-
-                      <div style={styles.dateBlock}>
-                        <div style={styles.dateLabelRow}>
-                          <span>📅 Logged:</span> {formatDate(job.created_at)}
-                        </div>
-                        {job.completed_at && (
-                          <div style={styles.dateLabelRow}>
-                            <span>✅ Completed:</span> {formatDate(job.completed_at)}
-                          </div>
-                        )}
-                      </div>
-
-                      {job.status !== 'Delivered' && (
-                        <div style={styles.jobCardActions}>
+                      {p.role !== 'admin' && (
+                        <div style={styles.adminActionsRow}>
+                          <button onClick={() => extendSubscription(p, 1)} style={styles.btnQuickAdd}>
+                            +1 Mo
+                          </button>
+                          <button onClick={() => extendSubscription(p, 6)} style={styles.btnQuickAdd}>
+                            +6 Mo
+                          </button>
+                          <button onClick={() => extendSubscription(p, 12)} style={styles.btnQuickAdd}>
+                            +1 Yr
+                          </button>
                           <button
-                            onClick={() => sendWhatsAppNotification(job)}
-                            style={styles.btnWhatsApp}
+                            onClick={() => {
+                              setEditingDateProfile(p)
+                              const currentIso = p.expiry_date ? new Date(p.expiry_date).toISOString().slice(0, 10) : ''
+                              setCustomDateInput(currentIso)
+                            }}
+                            style={styles.btnQuickAdd}
                           >
-                            💬 Send WhatsApp Status Link
+                            📅 Set Date
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingRateProfile(p)
+                              setCustomRateInput(p.monthly_rate ? p.monthly_rate.toString() : '2000')
+                            }}
+                            style={styles.btnEditRate}
+                          >
+                            ✏️ Rate
+                          </button>
+                          <button onClick={() => toggleShopStatus(p)} style={styles.btnToggleStatus}>
+                            {p.status === 'suspended' ? '▶️ Resume' : '⏸️ Pause'}
+                          </button>
+                          <button onClick={() => deleteShopAccount(p)} style={styles.btnDeleteShop}>
+                            🗑️
                           </button>
                         </div>
                       )}
                     </div>
                   )
                 })}
-
-                {/* LOAD MORE BUTTON FOR COMPLETED TAB */}
-                {activeTab === 'completed' && hasMoreCompleted && (
-                  <button
-                    onClick={handleLoadMoreCompleted}
-                    style={styles.btnLoadMore}
-                    disabled={loadingCompletedMore}
-                  >
-                    {loadingCompletedMore ? 'Loading older jobs...' : '⬇️ Load 50 Older Completed Jobs'}
-                  </button>
-                )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* FOOTER EXPIRY */}
-      {profile?.role !== 'admin' && (
-        <footer style={styles.pageFooter}>
-          FixTrack Workspace • Subscription Expiry: {formatDateOnly(profile?.expiry_date)}
-        </footer>
-      )}
-
-      {/* --- STRICT 1-PAGE SMART RECEIPT MODAL --- */}
-      {receiptJob && (
-        <div style={styles.modalOverlay} onClick={() => setReceiptJob(null)}>
-          <div
-            style={styles.receiptModalCard}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* PHYSICAL PRINT & DISPLAY AREA */}
-            <div id="receipt-print-area" style={styles.receiptPrintWrapper}>
-              <div style={styles.receiptHeader}>
-                <h2 style={styles.receiptShopName}>{currentShopBrandTitle}</h2>
-                <p style={styles.receiptSubtext}>Professional Device Repair & Service</p>
-                <div style={styles.receiptDividerDashed} />
-                <div style={styles.receiptTypeTitle}>
-                  {receiptJob.status === 'Delivered' ? 'FINAL SERVICE INVOICE' : 'REPAIR INTAKE DOCKET'}
-                </div>
+        ) : (
+          /* REGULAR SHOPKEEPER DASHBOARD */
+          <div>
+            {/* STATS BAR */}
+            <div style={styles.statsBarGrid}>
+              <div style={styles.statCard}>
+                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>IN SHOP</span>
+                <strong style={{ fontSize: '18px', color: '#2563eb' }}>{activeRepairs.length} Jobs</strong>
               </div>
-
-              <div style={styles.receiptDataGrid}>
-                <div style={styles.receiptRow}>
-                  <span>Job Number:</span>
-                  <strong>#{receiptJob.job_number || receiptJob.id}</strong>
-                </div>
-                <div style={styles.receiptRow}>
-                  <span>Date:</span>
-                  <span>{formatDate(receiptJob.created_at)}</span>
-                </div>
-                {receiptJob.completed_at && (
-                  <div style={styles.receiptRow}>
-                    <span>Delivered:</span>
-                    <span>{formatDate(receiptJob.completed_at)}</span>
-                  </div>
-                )}
-                <div style={styles.receiptRow}>
-                  <span>Customer:</span>
-                  <strong>{receiptJob.customer_name}</strong>
-                </div>
-                <div style={styles.receiptRow}>
-                  <span>Phone:</span>
-                  <span>{formatDisplayPhone(receiptJob.phone_number)}</span>
-                </div>
-                <div style={styles.receiptDividerSolid} />
-                <div style={styles.receiptRow}>
-                  <span>Device:</span>
-                  <strong>{receiptJob.device_model}</strong>
-                </div>
-                <div style={styles.receiptRow}>
-                  <span>Reported Fault:</span>
-                  <span>{receiptJob.issue || 'General Inspection'}</span>
-                </div>
-                {receiptJob.warranty && receiptJob.warranty !== 'None' && (
-                  <div style={styles.receiptRow}>
-                    <span>Warranty:</span>
-                    <strong>{receiptJob.warranty}</strong>
-                  </div>
-                )}
-                <div style={styles.receiptDividerSolid} />
-                <div style={{ ...styles.receiptRow, fontSize: '13px' }}>
-                  <strong>Total Amount:</strong>
-                  <strong>{formatCostDisplay(receiptJob.cost)}</strong>
-                </div>
-                <div style={styles.receiptRow}>
-                  <span>Status:</span>
-                  <strong>{receiptJob.status}</strong>
-                </div>
+              <div style={styles.statCard}>
+                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>DELIVERED (MO)</span>
+                <strong style={{ fontSize: '18px', color: '#10b981' }}>{monthlyDeliveredCount} Jobs</strong>
               </div>
+              <div
+                style={{ ...styles.statCard, cursor: 'pointer' }}
+                onClick={() => setShowRevenueHistoryModal(true)}
+                title="Click to view revenue history for previous months"
+              >
+                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>THIS MONTH</span>
+                <strong style={{ fontSize: '16px', color: '#059669' }}>LKR {monthlyRevenue.toLocaleString()}</strong>
+              </div>
+            </div>
 
-              {/* DYNAMIC QR CODE */}
-              <div style={styles.receiptQrSection}>
-                <QRCodeSVG
-                  value={`${window.location.origin}?track=${receiptJob.tracking_token || receiptJob.id}`}
-                  size={85}
-                  level="M"
+            {/* TOOLBAR */}
+            <div style={styles.toolbarGrid}>
+              <button onClick={() => setShowSettingsModal(true)} style={styles.btnToolSecondary}>
+                ⚙️ Shop Settings
+              </button>
+              <button onClick={exportToCSV} style={styles.btnToolPrimary} disabled={exportingCSV}>
+                {exportingCSV ? '⏳ Exporting...' : '📥 Export (CSV)'}
+              </button>
+            </div>
+
+            <div style={styles.card}>
+              <h2 style={styles.cardTitle}>Log New Repair Job</h2>
+              <form onSubmit={handleAddRepair} style={styles.formGrid}>
+                <input
+                  type="text"
+                  placeholder="Customer Name *"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  style={styles.input}
                 />
-                <p style={styles.receiptQrLabel}>
-                  {receiptJob.status === 'Delivered'
-                    ? 'Scan to review us & view digital bill'
-                    : 'Scan camera to track repair progress live'}
-                </p>
-              </div>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="WhatsApp Phone (e.g. 0771234567) *"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  style={styles.input}
+                />
+                <input
+                  type="text"
+                  placeholder="Device Model (e.g. iPhone 11) *"
+                  value={deviceModel}
+                  onChange={(e) => setDeviceModel(e.target.value)}
+                  style={styles.input}
+                />
 
-              <div style={styles.receiptFooter}>
-                <p style={styles.receiptTerms}>
-                  * Please present this slip for collection. Not responsible for devices unclaimed after 30 days.
-                </p>
-                <p style={styles.receiptPowered}>Powered by FixTrack LK</p>
-              </div>
+                <div>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      placeholder="Issue / Fault (e.g. Display Replacement)"
+                      value={issue}
+                      onChange={(e) => setIssue(e.target.value)}
+                      style={{ ...styles.input, paddingRight: '30px' }}
+                    />
+                    {issue && (
+                      <button
+                        type="button"
+                        onClick={() => setIssue('')}
+                        style={styles.btnClearInput}
+                        title="Clear field"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={styles.presetContainer}>
+                    {DEFAULT_FAULTS.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => appendFaultTag(tag)}
+                        style={styles.presetChip}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Warranty (Optional - e.g. 1 Month, 7 Days)"
+                    value={warranty}
+                    onChange={(e) => setWarranty(e.target.value)}
+                    style={styles.input}
+                  />
+                  <div style={styles.presetContainer}>
+                    {WARRANTY_PRESETS.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setWarranty(tag === 'None' ? '' : tag)}
+                        style={{
+                          ...styles.presetChip,
+                          backgroundColor: (warranty === tag || (tag === 'None' && !warranty)) ? '#dbeafe' : '#f1f5f9',
+                          borderColor: (warranty === tag || (tag === 'None' && !warranty)) ? '#3b82f6' : '#cbd5e1',
+                          color: (warranty === tag || (tag === 'None' && !warranty)) ? '#1d4ed8' : '#334155',
+                        }}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Internal Notes (e.g. Password: 1234)"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  style={styles.input}
+                />
+
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="Cost LKR (Leave blank if pending estimate)"
+                  value={cost}
+                  onChange={(e) => setCost(e.target.value)}
+                  style={styles.input}
+                />
+                <button type="submit" style={styles.btnPrimary}>
+                  Save Job
+                </button>
+              </form>
             </div>
 
-            {/* SCREEN-ONLY ACTION TOOLBAR */}
-            <div style={styles.receiptActionToolbar}>
-              <button
-                onClick={printReceiptStrictSinglePage}
-                style={styles.btnPrintReceipt}
-              >
-                🖨️ Print Slip / Save PDF
-              </button>
-              <button
-                onClick={() => setReceiptJob(null)}
-                style={styles.btnCloseReceipt}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            <div style={styles.card}>
+              <div style={styles.tabBar}>
+                <button
+                  onClick={() => setActiveTab('active')}
+                  style={activeTab === 'active' ? styles.tabActiveBlue : styles.tabInactive}
+                >
+                  Active Repairs ({activeRepairs.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('completed')}
+                  style={activeTab === 'completed' ? styles.tabActiveGreen : styles.tabInactive}
+                >
+                  Completed ({completedRepairs.length}{hasMoreCompleted ? '+' : ''})
+                </button>
+              </div>
 
-      {/* SHOP SETTINGS & SECURITY MODAL */}
-      {showSettingsModal && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <h3 style={{ marginTop: 0, color: '#0f172a' }}>⚙️ Shop Settings & Security</h3>
-            <p style={{ color: '#475569', fontSize: '13px', lineHeight: '1.4', marginBottom: '14px' }}>
-              Configure your shop brand, review link, and account credentials:
-            </p>
-            <form onSubmit={handleSaveShopSettings} style={styles.formGrid}>
-              <label style={styles.label}>Shop Name (Shown on tracking header & receipts)</label>
               <input
                 type="text"
-                placeholder="e.g. Colombo Care"
-                value={shopNameInput}
-                onChange={(e) => setShopNameInput(e.target.value)}
-                style={styles.input}
-                required
+                placeholder="🔍 Search customer, device, phone, notes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={styles.searchInput}
               />
 
-              <label style={styles.label}>Google Maps Review Link (Optional)</label>
-              <input
-                type="url"
-                placeholder="https://maps.app.goo.gl/..."
-                value={googleReviewInput}
-                onChange={(e) => setGoogleReviewInput(e.target.value)}
-                style={styles.input}
-              />
-
-              <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '8px 0' }} />
-
-              <label style={styles.label}>🔑 Change Account Password (Optional)</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showNewPassword ? 'text' : 'password'}
-                  placeholder="Enter new password (min 6 characters)"
-                  value={newPasswordInput}
-                  onChange={(e) => setNewPasswordInput(e.target.value)}
-                  style={{ ...styles.input, paddingRight: '40px' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
-                  style={styles.btnEyeToggle}
-                  title={showNewPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showNewPassword ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.45 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                      <line x1="1" y1="1" x2="23" y2="23" />
-                    </svg>
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-              <span style={{ fontSize: '11px', color: '#64748b', marginTop: '-4px' }}>
-                Leave blank if you don't want to change your password.
-              </span>
-
-              <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-                <button type="submit" style={styles.btnPrimary} disabled={settingsSaving}>
-                  {settingsSaving ? 'Saving...' : 'Save Settings'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewPasswordInput('')
-                    setShowSettingsModal(false)
-                  }}
-                  style={styles.btnCancel}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* REVENUE HISTORY MODAL */}
-      {showRevenueHistoryModal && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <h3 style={{ marginTop: 0, color: '#0f172a' }}>📊 Monthly Revenue History</h3>
-            <p style={{ color: '#475569', fontSize: '13px', marginBottom: '14px' }}>
-              Completed repairs earnings breakdown by month:
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
-              {Object.keys(monthlyRevenueHistory).length === 0 ? (
-                <p style={{ color: '#64748b', fontSize: '13px', textAlign: 'center' }}>No completed earnings history recorded yet.</p>
+              {loading ? (
+                <p style={{ textAlign: 'center', padding: '20px' }}>Loading database...</p>
+              ) : displayedJobs.length === 0 ? (
+                <p style={{ textAlign: 'center', color: '#64748b', padding: '20px' }}>
+                  {activeTab === 'active'
+                    ? 'No active repair jobs right now.'
+                    : 'No completed repairs found.'}
+                </p>
               ) : (
-                Object.entries(monthlyRevenueHistory).map(([month, rev]) => (
-                  <div key={month} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontWeight: '600', fontSize: '14px' }}>{month}</span>
-                    <strong style={{ color: '#059669', fontSize: '14px' }}>LKR {rev.toLocaleString()}</strong>
-                  </div>
-                ))
+                <div style={styles.jobList}>
+                  {displayedJobs.map((job) => {
+                    const displayJobNumber = job.job_number || job.id
+                    return (
+                      <div key={job.id} style={styles.jobCard}>
+                        <div style={styles.jobCardHeader}>
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <span style={styles.jobId}>#{displayJobNumber}</span>
+                            <strong style={{ fontSize: '16px', marginLeft: '8px' }}>
+                              {job.customer_name}
+                            </strong>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <select
+                              value={job.status}
+                              onChange={(e) => updateStatus(job.id, e.target.value, job)}
+                              style={{
+                                ...getStatusStyle(job.status),
+                                paddingRight: '22px',
+                              }}
+                            >
+                              <option value="Received">Received</option>
+                              <option value="In Progress">In Progress</option>
+                              <option value="Ready">Ready</option>
+                              <option value="Delivered">Delivered</option>
+                            </select>
+
+                            <div style={{ position: 'relative' }}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setActiveMenuId(activeMenuId === job.id ? null : job.id)
+                                }}
+                                style={styles.btnMenuDots}
+                              >
+                                ⋮
+                              </button>
+
+                              {activeMenuId === job.id && (
+                                <div style={styles.dropdownMenu}>
+                                  <button
+                                    onClick={() => {
+                                      setReceiptJob(job)
+                                      setActiveMenuId(null)
+                                    }}
+                                    style={styles.dropdownItem}
+                                  >
+                                    🧾 View / Print Receipt
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingJob(job)
+                                      setActiveMenuId(null)
+                                    }}
+                                    style={styles.dropdownItem}
+                                  >
+                                    ✏️ Edit Details
+                                  </button>
+                                  <button
+                                    onClick={() => deleteRepair(job.id)}
+                                    style={{ ...styles.dropdownItem, color: '#ef4444' }}
+                                  >
+                                    🗑️ Delete Job
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={styles.jobCardBodyStack}>
+                          <p style={styles.jobText}>
+                            <span>📱 Device:</span> <strong>{job.device_model}</strong>
+                          </p>
+                          <p style={styles.jobText}>
+                            <span>🔧 Fault:</span> <strong>{job.issue || '-'}</strong>
+                          </p>
+                          {job.warranty && job.warranty !== 'None' && (
+                            <p style={styles.jobText}>
+                              <span>🛡️ Warranty:</span> <strong>{job.warranty}</strong>
+                            </p>
+                          )}
+                          {job.notes && (
+                            <p style={{ ...styles.jobText, color: '#64748b' }}>
+                              <span>📝 Notes:</span> <em>{job.notes}</em>
+                            </p>
+                          )}
+                          <p style={styles.jobText}>
+                            <span>📞 Phone:</span>{' '}
+                            <strong>{formatDisplayPhone(job.phone_number)}</strong>
+                          </p>
+                          <p style={styles.jobText}>
+                            <span>💰 Cost:</span> <strong>{formatCostDisplay(job.cost)}</strong>
+                          </p>
+                        </div>
+
+                        <div style={styles.dateBlock}>
+                          <div style={styles.dateLabelRow}>
+                            <span>📅 Logged:</span> {formatDate(job.created_at)}
+                          </div>
+                          {job.completed_at && (
+                            <div style={styles.dateLabelRow}>
+                              <span>✅ Completed:</span> {formatDate(job.completed_at)}
+                            </div>
+                          )}
+                        </div>
+
+                        {job.status !== 'Delivered' && (
+                          <div style={styles.jobCardActions}>
+                            <button
+                              onClick={() => sendWhatsAppNotification(job)}
+                              style={styles.btnWhatsApp}
+                            >
+                              💬 Send WhatsApp Status Link
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  {/* LOAD MORE BUTTON FOR COMPLETED TAB */}
+                  {activeTab === 'completed' && hasMoreCompleted && (
+                    <button
+                      onClick={handleLoadMoreCompleted}
+                      style={styles.btnLoadMore}
+                      disabled={loadingCompletedMore}
+                    >
+                      {loadingCompletedMore ? 'Loading older jobs...' : '⬇️ Load 50 Older Completed Jobs'}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
-
-            <button onClick={() => setShowRevenueHistoryModal(false)} style={{ ...styles.btnCancel, marginTop: '16px' }}>
-              Close
-            </button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* RENEWAL MODAL */}
-      {showPayModal && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <h3 style={{ marginTop: 0, color: '#1e3a8a' }}>💳 FixTrack Renewal Details</h3>
-            <p style={{ color: '#475569', fontSize: '13px', lineHeight: '1.4' }}>
-              Thank you for partnering with us! Please transfer your subscription payment using the details below:
-            </p>
+        {/* FOOTER EXPIRY */}
+        {profile?.role !== 'admin' && (
+          <footer style={styles.pageFooter}>
+            FixTrack Workspace • Subscription Expiry: {formatDateOnly(profile?.expiry_date)}
+          </footer>
+        )}
 
-            <div style={styles.bankBox}>
-              <p style={{ margin: '4px 0', fontSize: '13px' }}>
-                <strong>Current Rate:</strong> LKR {profile?.monthly_rate || 2000} / month
-              </p>
-              <p style={{ margin: '4px 0', fontSize: '13px' }}>
-                <strong>Expires On:</strong> {formatDateOnly(profile?.expiry_date)}
-              </p>
-              <hr style={{ border: 'none', borderTop: '1px solid #bfdbfe', margin: '8px 0' }} />
-              <p style={{ margin: '4px 0', fontSize: '13px' }}>
-                <strong>Bank:</strong> Commercial Bank (Kandy Branch)
-              </p>
-              <p style={{ margin: '4px 0', fontSize: '13px' }}>
-                <strong>Account Name:</strong> M.T.M Rakeeb
-              </p>
-              <p style={{ margin: '4px 0', fontSize: '13px' }}>
-                <strong>Account No:</strong> 8012055155
-              </p>
+        {/* --- SCREEN MODAL FOR RECEIPT PREVIEW --- */}
+        {receiptJob && (
+          <div style={styles.modalOverlay} onClick={() => setReceiptJob(null)}>
+            <div
+              style={styles.receiptModalCard}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={styles.receiptPrintWrapper}>
+                <div style={styles.receiptHeader}>
+                  <h2 style={styles.receiptShopName}>{currentShopBrandTitle}</h2>
+                  <p style={styles.receiptSubtext}>Professional Device Repair & Service</p>
+                  <div style={styles.receiptDividerDashed} />
+                  <div style={styles.receiptTypeTitle}>
+                    {receiptJob.status === 'Delivered' ? 'FINAL SERVICE INVOICE' : 'REPAIR INTAKE DOCKET'}
+                  </div>
+                </div>
+
+                <div style={styles.receiptDataGrid}>
+                  <div style={styles.receiptRow}>
+                    <span>Job Number:</span>
+                    <strong>#{receiptJob.job_number || receiptJob.id}</strong>
+                  </div>
+                  <div style={styles.receiptRow}>
+                    <span>Date:</span>
+                    <span>{formatDate(receiptJob.created_at)}</span>
+                  </div>
+                  {receiptJob.completed_at && (
+                    <div style={styles.receiptRow}>
+                      <span>Delivered:</span>
+                      <span>{formatDate(receiptJob.completed_at)}</span>
+                    </div>
+                  )}
+                  <div style={styles.receiptRow}>
+                    <span>Customer:</span>
+                    <strong>{receiptJob.customer_name}</strong>
+                  </div>
+                  <div style={styles.receiptRow}>
+                    <span>Phone:</span>
+                    <span>{formatDisplayPhone(receiptJob.phone_number)}</span>
+                  </div>
+                  <div style={styles.receiptDividerSolid} />
+                  <div style={styles.receiptRow}>
+                    <span>Device:</span>
+                    <strong>{receiptJob.device_model}</strong>
+                  </div>
+                  <div style={styles.receiptRow}>
+                    <span>Reported Fault:</span>
+                    <span>{receiptJob.issue || 'General Inspection'}</span>
+                  </div>
+                  {receiptJob.warranty && receiptJob.warranty !== 'None' && (
+                    <div style={styles.receiptRow}>
+                      <span>Warranty:</span>
+                      <strong>{receiptJob.warranty}</strong>
+                    </div>
+                  )}
+                  <div style={styles.receiptDividerSolid} />
+                  <div style={{ ...styles.receiptRow, fontSize: '13px' }}>
+                    <strong>Total Amount:</strong>
+                    <strong>{formatCostDisplay(receiptJob.cost)}</strong>
+                  </div>
+                  <div style={styles.receiptRow}>
+                    <span>Status:</span>
+                    <strong>{receiptJob.status}</strong>
+                  </div>
+                </div>
+
+                <div style={styles.receiptQrSection}>
+                  <QRCodeSVG
+                    value={`${window.location.origin}?track=${receiptJob.tracking_token || receiptJob.id}`}
+                    size={85}
+                    level="M"
+                  />
+                  <p style={styles.receiptQrLabel}>
+                    {receiptJob.status === 'Delivered'
+                      ? 'Scan to review us & view digital bill'
+                      : 'Scan camera to track repair progress live'}
+                  </p>
+                </div>
+
+                <div style={styles.receiptFooter}>
+                  <p style={styles.receiptTerms}>
+                    * Please present this slip for collection. Not responsible for devices unclaimed after 30 days.
+                  </p>
+                  <p style={styles.receiptPowered}>Powered by FixTrack LK</p>
+                </div>
+              </div>
+
+              <div style={styles.receiptActionToolbar}>
+                <button
+                  onClick={triggerInPlacePrint}
+                  style={styles.btnPrintReceipt}
+                >
+                  🖨️ Print Slip / Save PDF
+                </button>
+                <button
+                  onClick={() => setReceiptJob(null)}
+                  style={styles.btnCloseReceipt}
+                >
+                  Close
+                </button>
+              </div>
             </div>
+          </div>
+        )}
 
-            <p style={{ color: '#64748b', fontSize: '12px', margin: '0 0 12px 0' }}>
-              Once transferred, tap below to open WhatsApp and share your payment receipt.
-            </p>
+        {/* SHOP SETTINGS & SECURITY MODAL */}
+        {showSettingsModal && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={{ marginTop: 0, color: '#0f172a' }}>⚙️ Shop Settings & Security</h3>
+              <p style={{ color: '#475569', fontSize: '13px', lineHeight: '1.4', marginBottom: '14px' }}>
+                Configure your shop brand, review link, and account credentials:
+              </p>
+              <form onSubmit={handleSaveShopSettings} style={styles.formGrid}>
+                <label style={styles.label}>Shop Name (Shown on tracking header & receipts)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Colombo Care"
+                  value={shopNameInput}
+                  onChange={(e) => setShopNameInput(e.target.value)}
+                  style={styles.input}
+                  required
+                />
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button onClick={sendRenewalWhatsApp} style={styles.btnWhatsApp}>
-                💬 Send Receipt on WhatsApp (0701833931)
-              </button>
-              <button onClick={() => setShowPayModal(false)} style={styles.btnCancel}>
+                <label style={styles.label}>Google Maps Review Link (Optional)</label>
+                <input
+                  type="url"
+                  placeholder="https://maps.app.goo.gl/..."
+                  value={googleReviewInput}
+                  onChange={(e) => setGoogleReviewInput(e.target.value)}
+                  style={styles.input}
+                />
+
+                <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '8px 0' }} />
+
+                <label style={styles.label}>🔑 Change Account Password (Optional)</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    placeholder="Enter new password (min 6 characters)"
+                    value={newPasswordInput}
+                    onChange={(e) => setNewPasswordInput(e.target.value)}
+                    style={{ ...styles.input, paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    style={styles.btnEyeToggle}
+                    title={showNewPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showNewPassword ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.45 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '-4px' }}>
+                  Leave blank if you don't want to change your password.
+                </span>
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                  <button type="submit" style={styles.btnPrimary} disabled={settingsSaving}>
+                    {settingsSaving ? 'Saving...' : 'Save Settings'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewPasswordInput('')
+                      setShowSettingsModal(false)
+                    }}
+                    style={styles.btnCancel}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* REVENUE HISTORY MODAL */}
+        {showRevenueHistoryModal && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={{ marginTop: 0, color: '#0f172a' }}>📊 Monthly Revenue History</h3>
+              <p style={{ color: '#475569', fontSize: '13px', marginBottom: '14px' }}>
+                Completed repairs earnings breakdown by month:
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto' }}>
+                {Object.keys(monthlyRevenueHistory).length === 0 ? (
+                  <p style={{ color: '#64748b', fontSize: '13px', textAlign: 'center' }}>No completed earnings history recorded yet.</p>
+                ) : (
+                  Object.entries(monthlyRevenueHistory).map(([month, rev]) => (
+                    <div key={month} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <span style={{ fontWeight: '600', fontSize: '14px' }}>{month}</span>
+                      <strong style={{ color: '#059669', fontSize: '14px' }}>LKR {rev.toLocaleString()}</strong>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <button onClick={() => setShowRevenueHistoryModal(false)} style={{ ...styles.btnCancel, marginTop: '16px' }}>
                 Close
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* EDIT JOB MODAL */}
-      {editingJob && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <h3 style={{ marginTop: 0 }}>Edit Job #{editingJob.job_number || editingJob.id}</h3>
-            <form onSubmit={handleSaveEdit} style={styles.formGrid}>
-              <label style={styles.label}>Customer Name</label>
-              <input
-                type="text"
-                value={editingJob.customer_name}
-                onChange={(e) =>
-                  setEditingJob({ ...editingJob, customer_name: e.target.value })
-                }
-                style={styles.input}
-              />
+        {/* RENEWAL MODAL */}
+        {showPayModal && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={{ marginTop: 0, color: '#1e3a8a' }}>💳 FixTrack Renewal Details</h3>
+              <p style={{ color: '#475569', fontSize: '13px', lineHeight: '1.4' }}>
+                Thank you for partnering with us! Please transfer your subscription payment using the details below:
+              </p>
 
-              <label style={styles.label}>WhatsApp Phone</label>
-              <input
-                type="tel"
-                inputMode="tel"
-                value={formatDisplayPhone(editingJob.phone_number)}
-                onChange={(e) =>
-                  setEditingJob({ ...editingJob, phone_number: e.target.value })
-                }
-                style={styles.input}
-              />
+              <div style={styles.bankBox}>
+                <p style={{ margin: '4px 0', fontSize: '13px' }}>
+                  <strong>Current Rate:</strong> LKR {profile?.monthly_rate || 2000} / month
+                </p>
+                <p style={{ margin: '4px 0', fontSize: '13px' }}>
+                  <strong>Expires On:</strong> {formatDateOnly(profile?.expiry_date)}
+                </p>
+                <hr style={{ border: 'none', borderTop: '1px solid #bfdbfe', margin: '8px 0' }} />
+                <p style={{ margin: '4px 0', fontSize: '13px' }}>
+                  <strong>Bank:</strong> Commercial Bank (Kandy Branch)
+                </p>
+                <p style={{ margin: '4px 0', fontSize: '13px' }}>
+                  <strong>Account Name:</strong> M.T.M Rakeeb
+                </p>
+                <p style={{ margin: '4px 0', fontSize: '13px' }}>
+                  <strong>Account No:</strong> 8012055155
+                </p>
+              </div>
 
-              <label style={styles.label}>Device Model</label>
-              <input
-                type="text"
-                value={editingJob.device_model}
-                onChange={(e) =>
-                  setEditingJob({ ...editingJob, device_model: e.target.value })
-                }
-                style={styles.input}
-              />
+              <p style={{ color: '#64748b', fontSize: '12px', margin: '0 0 12px 0' }}>
+                Once transferred, tap below to open WhatsApp and share your payment receipt.
+              </p>
 
-              <label style={styles.label}>Issue / Fault</label>
-              <input
-                type="text"
-                value={editingJob.issue || ''}
-                onChange={(e) =>
-                  setEditingJob({ ...editingJob, issue: e.target.value })
-                }
-                style={styles.input}
-              />
-
-              <label style={styles.label}>Warranty (Optional)</label>
-              <input
-                type="text"
-                value={editingJob.warranty || ''}
-                onChange={(e) =>
-                  setEditingJob({ ...editingJob, warranty: e.target.value })
-                }
-                style={styles.input}
-                placeholder="e.g. 1 Month, 7 Days"
-              />
-
-              <label style={styles.label}>Internal Notes</label>
-              <input
-                type="text"
-                value={editingJob.notes || ''}
-                onChange={(e) =>
-                  setEditingJob({ ...editingJob, notes: e.target.value })
-                }
-                style={styles.input}
-              />
-
-              <label style={styles.label}>Cost (LKR)</label>
-              <input
-                type="number"
-                inputMode="numeric"
-                placeholder="Leave 0 or blank for Pending Estimate"
-                value={editingJob.cost || ''}
-                onChange={(e) =>
-                  setEditingJob({ ...editingJob, cost: e.target.value })
-                }
-                style={styles.input}
-              />
-
-              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                <button type="submit" style={styles.btnPrimary}>
-                  Save Changes
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button onClick={sendRenewalWhatsApp} style={styles.btnWhatsApp}>
+                  💬 Send Receipt on WhatsApp (0701833931)
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setEditingJob(null)}
-                  style={styles.btnCancel}
-                >
-                  Cancel
+                <button onClick={() => setShowPayModal(false)} style={styles.btnCancel}>
+                  Close
                 </button>
               </div>
-            </form>
+            </div>
+          </div>
+        )}
+
+        {/* EDIT JOB MODAL */}
+        {editingJob && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={{ marginTop: 0 }}>Edit Job #{editingJob.job_number || editingJob.id}</h3>
+              <form onSubmit={handleSaveEdit} style={styles.formGrid}>
+                <label style={styles.label}>Customer Name</label>
+                <input
+                  type="text"
+                  value={editingJob.customer_name}
+                  onChange={(e) =>
+                    setEditingJob({ ...editingJob, customer_name: e.target.value })
+                  }
+                  style={styles.input}
+                />
+
+                <label style={styles.label}>WhatsApp Phone</label>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={formatDisplayPhone(editingJob.phone_number)}
+                  onChange={(e) =>
+                    setEditingJob({ ...editingJob, phone_number: e.target.value })
+                  }
+                  style={styles.input}
+                />
+
+                <label style={styles.label}>Device Model</label>
+                <input
+                  type="text"
+                  value={editingJob.device_model}
+                  onChange={(e) =>
+                    setEditingJob({ ...editingJob, device_model: e.target.value })
+                  }
+                  style={styles.input}
+                />
+
+                <label style={styles.label}>Issue / Fault</label>
+                <input
+                  type="text"
+                  value={editingJob.issue || ''}
+                  onChange={(e) =>
+                    setEditingJob({ ...editingJob, issue: e.target.value })
+                  }
+                  style={styles.input}
+                />
+
+                <label style={styles.label}>Warranty (Optional)</label>
+                <input
+                  type="text"
+                  value={editingJob.warranty || ''}
+                  onChange={(e) =>
+                    setEditingJob({ ...editingJob, warranty: e.target.value })
+                  }
+                  style={styles.input}
+                  placeholder="e.g. 1 Month, 7 Days"
+                />
+
+                <label style={styles.label}>Internal Notes</label>
+                <input
+                  type="text"
+                  value={editingJob.notes || ''}
+                  onChange={(e) =>
+                    setEditingJob({ ...editingJob, notes: e.target.value })
+                  }
+                  style={styles.input}
+                />
+
+                <label style={styles.label}>Cost (LKR)</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="Leave 0 or blank for Pending Estimate"
+                  value={editingJob.cost || ''}
+                  onChange={(e) =>
+                    setEditingJob({ ...editingJob, cost: e.target.value })
+                  }
+                  style={styles.input}
+                />
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                  <button type="submit" style={styles.btnPrimary}>
+                    Save Changes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingJob(null)}
+                    style={styles.btnCancel}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* EDIT EXPIRY DATE MODAL (ADMIN) */}
+        {editingDateProfile && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={{ marginTop: 0 }}>Set Custom Expiry Date for {editingDateProfile.email}</h3>
+              <form onSubmit={saveCustomExpiryDate} style={styles.formGrid}>
+                <label style={styles.label}>Select Expiry Date</label>
+                <input
+                  type="date"
+                  value={customDateInput}
+                  onChange={(e) => setCustomDateInput(e.target.value)}
+                  style={styles.input}
+                  required
+                />
+                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                  <button type="submit" style={styles.btnPrimary}>
+                    Save Expiry Date
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingDateProfile(null)}
+                    style={styles.btnCancel}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* EDIT RATE MODAL (ADMIN) */}
+        {editingRateProfile && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={{ marginTop: 0 }}>Edit Custom Rate for {editingRateProfile.email}</h3>
+              <form onSubmit={updateMonthlyRate} style={styles.formGrid}>
+                <label style={styles.label}>Monthly Rate (LKR)</label>
+                <input
+                  type="text"
+                  value={customRateInput}
+                  onChange={(e) => setCustomRateInput(e.target.value)}
+                  style={styles.input}
+                  placeholder="2000"
+                  required
+                />
+                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                  <button type="submit" style={styles.btnPrimary}>
+                    Update Rate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingRateProfile(null)}
+                    style={styles.btnCancel}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* --- DEDICATED DIRECT PRINT ROOT (Renders strictly during print) --- */}
+      {receiptJob && (
+        <div id="direct-print-root" style={{ display: 'none' }}>
+          <div style={{ width: '100%', maxWidth: '68mm', margin: '0 auto', padding: '6mm 4mm 4mm 4mm', boxSizing: 'border-box', fontFamily: '"Courier New", Courier, monospace', color: '#000', backgroundColor: '#fff' }}>
+            <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+              <h2 style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 'bold', textTransform: 'uppercase' }}>{currentShopBrandTitle}</h2>
+              <p style={{ margin: 0, fontSize: '10px', color: '#555555' }}>Professional Device Repair & Service</p>
+              <div style={{ borderTop: '1px dashed #000000', margin: '6px 0' }} />
+              <div style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+                {receiptJob.status === 'Delivered' ? 'FINAL SERVICE INVOICE' : 'REPAIR INTAKE DOCKET'}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Job Number:</span>
+                <strong>#{receiptJob.job_number || receiptJob.id}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Date:</span>
+                <span>{formatDate(receiptJob.created_at)}</span>
+              </div>
+              {receiptJob.completed_at && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Delivered:</span>
+                  <span>{formatDate(receiptJob.completed_at)}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Customer:</span>
+                <strong>{receiptJob.customer_name}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Phone:</span>
+                <span>{formatDisplayPhone(receiptJob.phone_number)}</span>
+              </div>
+              <div style={{ borderTop: '1px solid #000000', margin: '5px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Device:</span>
+                <strong>{receiptJob.device_model}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Reported Fault:</span>
+                <span>{receiptJob.issue || 'General Inspection'}</span>
+              </div>
+              {receiptJob.warranty && receiptJob.warranty !== 'None' && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Warranty:</span>
+                  <strong>{receiptJob.warranty}</strong>
+                </div>
+              )}
+              <div style={{ borderTop: '1px solid #000000', margin: '5px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
+                <strong>Total Amount:</strong>
+                <strong>{formatCostDisplay(receiptJob.cost)}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Status:</span>
+                <strong>{receiptJob.status}</strong>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: '8px', padding: '6px 0', borderTop: '1px dashed #000000', borderBottom: '1px dashed #000000' }}>
+              <QRCodeSVG
+                value={`${window.location.origin}?track=${receiptJob.tracking_token || receiptJob.id}`}
+                size={85}
+                level="M"
+              />
+              <p style={{ fontSize: '9px', textAlign: 'center', margin: '4px 0 0 0', maxWidth: '200px', fontWeight: 'bold' }}>
+                {receiptJob.status === 'Delivered'
+                  ? 'Scan to review us & view digital bill'
+                  : 'Scan camera to track repair progress live'}
+              </p>
+            </div>
+
+            <div style={{ textAlign: 'center', marginTop: '6px' }}>
+              <p style={{ fontSize: '8px', margin: '0 0 2px 0', color: '#444444', lineHeight: '1.2' }}>
+                * Please present this slip for collection. Not responsible for devices unclaimed after 30 days.
+              </p>
+              <p style={{ fontSize: '8px', fontWeight: 'bold', letterSpacing: '0.5px', margin: 0 }}>
+                Powered by FixTrack LK
+              </p>
+            </div>
           </div>
         </div>
       )}
-
-      {/* EDIT EXPIRY DATE MODAL (ADMIN) */}
-      {editingDateProfile && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <h3 style={{ marginTop: 0 }}>Set Custom Expiry Date for {editingDateProfile.email}</h3>
-            <form onSubmit={saveCustomExpiryDate} style={styles.formGrid}>
-              <label style={styles.label}>Select Expiry Date</label>
-              <input
-                type="date"
-                value={customDateInput}
-                onChange={(e) => setCustomDateInput(e.target.value)}
-                style={styles.input}
-                required
-              />
-              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                <button type="submit" style={styles.btnPrimary}>
-                  Save Expiry Date
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditingDateProfile(null)}
-                  style={styles.btnCancel}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* EDIT RATE MODAL (ADMIN) */}
-      {editingRateProfile && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <h3 style={{ marginTop: 0 }}>Edit Custom Rate for {editingRateProfile.email}</h3>
-            <form onSubmit={updateMonthlyRate} style={styles.formGrid}>
-              <label style={styles.label}>Monthly Rate (LKR)</label>
-              <input
-                type="text"
-                value={customRateInput}
-                onChange={(e) => setCustomRateInput(e.target.value)}
-                style={styles.input}
-                placeholder="2000"
-                required
-              />
-              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                <button type="submit" style={styles.btnPrimary}>
-                  Update Rate
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditingRateProfile(null)}
-                  style={styles.btnCancel}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   )
 }
 

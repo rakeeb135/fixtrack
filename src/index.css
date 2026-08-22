@@ -27,3 +27,42 @@ body {
   min-width: 320px;
   min-height: 100vh;
 }
+
+/* --- UNIVERSAL 1-PAGE CROSS-DEVICE PRINT RULES --- */
+@page {
+  margin: 0;
+  size: auto;
+}
+
+@media print {
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    overflow: hidden !important;
+  }
+
+  /* Hide the main application container during print */
+  #root > div:first-child {
+    display: none !important;
+  }
+
+  /* Force only the direct print container to render at top-left */
+  #direct-print-root {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
